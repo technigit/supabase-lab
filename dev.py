@@ -14,6 +14,7 @@
 import ast
 import re
 
+import backend
 import core
 
 ################################################################################
@@ -21,9 +22,9 @@ import core
 ################################################################################
 
 def explore(args = None):
-    if core.Main.session_active:
+    if core.Session.authenticated:
         try:
-            data = core.Main.supabase.auth.get_session().model_dump()
+            data = core.Session.supabase.auth.get_session().model_dump()
             found = True
             if args is not None:
                 found = False
@@ -67,7 +68,7 @@ def edge(args = None):
         payload = ast.literal_eval(payload_str)
     except: # pylint: disable=bare-except
         payload = {}
-    core.edge_function(core.Main.config['url'] + f"/functions/v1/{endpoint}", payload)
+    backend.edge_function(core.Session.config['url'] + f"/functions/v1/{endpoint}", payload)
 
 def ping(args = None):
     print(f"ping {args}")
@@ -96,3 +97,28 @@ def parse_args(args = None):
     if args is None:
         return None
     return args.split()
+
+################################################################################
+# debug function to inspect important values
+################################################################################
+
+def debug(args = ''):
+    if args is None:
+        args = ''
+    filter_list = args.split()
+    no_filters = len(filter_list) == 0
+    if 'url' in filter_list or no_filters:
+        print(f"url = {core.Session.url}")
+    if 'api_key' in filter_list or no_filters:
+        print(f"api_key = {core.Session.config['api_key'] if 'api_key' in core.Session.config else None}")
+    if 'email' in filter_list or no_filters:
+        print(f"email = {core.Session.config['email'] if 'email' in core.Session.config else None}")
+    if 'jwt_token' in filter_list or 'jwt' in filter_list or no_filters:
+        print(f"jwt_token = {core.Session.jwt_token}")
+    if 'running' in filter_list or no_filters:
+        print(f"running = {core.Main.running}")
+    if 'authenticated' in filter_list or no_filters:
+        print(f"authenticated = {core.Session.authenticated}")
+    if 'config' in filter_list or no_filters:
+        print('config:')
+        core.print_item(core.Session.config, '   ')
