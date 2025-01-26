@@ -17,6 +17,10 @@ import re
 import backend
 import core
 
+# non-printable null character for internal parsing
+SPACE_DELIM = '\x00'
+
+
 ################################################################################
 # get session configuration values
 ################################################################################
@@ -37,7 +41,7 @@ def get_config(config_files):
                             m = re.match(r'^(\S*)\s*=(\{.*\})$', line)
                     if m is not None:
                         key = m.group(1)
-                        value = m.group(2).replace(' ', '\x00')
+                        value = re.sub(r'\{([^}]*)\}', lambda m: '{' + m.group(1).replace(' ', SPACE_DELIM) + '}', m.group(2))
                         if value.lower() in ['t', 'true', 'y', '1']:
                             value = True
                         elif value.lower() in ['f', 'false', 'n', '0']:

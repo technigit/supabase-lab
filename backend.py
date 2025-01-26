@@ -7,7 +7,7 @@
 # backend.py - Supabase-oriented functions
 #
 # Copyright (c) 2024, 2025 Andy Warmack
-# This file is part of NAME?, licensed under the MIT License.
+# This file is part of Supabase Lab, licensed under the MIT License.
 # See the LICENSE file in the project root for more information.
 ################################################################################
 
@@ -42,8 +42,9 @@ def connect():
     # initialize the supabase client
     url = core.Session.url
     api_key = None
-    if 'url' in core.Session.config and 'api_key' in core.Session.config:
+    if 'url' in core.Session.config:
         url = core.Session.config['url']
+    if 'api_key' in core.Session.config:
         api_key = core.Session.config['api_key']
     print(f"Connecting to {url}")
     if api_key is None:
@@ -130,8 +131,8 @@ def sign_in(email, password):
     # get JWT token and greet user
     if response is not None:
         core.Session.jwt_token = response.session.access_token
-        email = core.Session.supabase.auth.get_user().model_dump()['user']['email']
-        last_sign_in_at = core.show_time(core.Session.supabase.auth.get_user().model_dump()['user']['last_sign_in_at'])
+        email = response.session.user.email
+        last_sign_in_at = core.show_time(response.user.last_sign_in_at)
         print(f"{email} logged in.")
         print(f"Last login: {last_sign_in_at}")
         core.Session.authenticated = True
@@ -143,4 +144,5 @@ def sign_in(email, password):
 def sign_out():
     print('Logging out.')
     core.Session.supabase.auth.sign_out({'scope': 'local'})
+    core.Session.jwt_token = None
     core.Session.authenticated = False

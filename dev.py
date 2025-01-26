@@ -17,6 +17,9 @@ import re
 import backend
 import core
 
+# non-printable null character for internal parsing
+SPACE_DELIM = '\x00'
+
 ################################################################################
 # explore supabase object for development purposes
 ################################################################################
@@ -63,7 +66,7 @@ def explore(args = None):
 def edge(args = None):
     pa = parse_args(args)
     endpoint = pa[0]
-    payload_str = pa[1].replace('\x00', ' ')
+    payload_str = pa[1].replace(SPACE_DELIM, ' ')
     try:
         payload = ast.literal_eval(payload_str)
     except: # pylint: disable=bare-except

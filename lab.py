@@ -15,12 +15,15 @@ import getpass
 import re
 import sys
 
+# for interactive up/down arrow history
+import readline # pylint: disable=unused-import
+
 import backend
 import core
 import dev
 import session
 
-core.Main.version = 'v0.0.2'
+core.Main.version = 'v0.0.3'
 
 ################################################################################
 # command-line interface
@@ -42,54 +45,7 @@ def prompt():
             # prompt for auth/session input
             line = input(core.Session.prompt if core.Session.authenticated else core.Main.auth_prompt)
             line = re.sub(r'\.\w+', parse_dot_references, line)
-
-            # parse input
-            command = line
-            args = None
-            m = re.search(r'^(\S*)\s(.*)$', line)
-            if m is not None:
-                command = m.group(1)
-                args = m.group(2)
-
-            # login
-            if command == 'login':
-                email = ''
-                password = ''
-                if 'email' in core.Session.config and 'password' in core.Session.config:
-                    email = core.Session.config['email']
-                    password = core.Session.config['password']
-                if email == '':
-                    print('Email: ', end='')
-                    email = input()
-                if password == '':
-                    password = getpass.getpass('Password: ')
-                backend.sign_in(email, password)
-
-            # exit
-            elif command == 'exit':
-                session.exit_completely()
-
-            # print
-            elif command == 'print':
-                if args is not None:
-                    print(args)
-                else:
-                    print()
-            elif command == 'logout':
-                backend.sign_out()
-
-            # undocumented, for development purposes
-            elif command == 'debug':
-                dev.debug(args)
-            elif command == 'dev':
-                dev.dev(args)
-
-            # unknown command
-            else:
-                print(f"{command}?")
-                print('   login')
-                print('   exit')
-                print('   print [text]')
+            parse(line)
 
         # error handling
         except EOFError:
@@ -104,6 +60,56 @@ def prompt():
             core.Session.supabase.auth.get_user()
         except: # pylint: disable=bare-except
             core.Session.authenticated = False
+
+def parse(line):
+    command = line
+    args = None
+    m = re.search(r'^(\S*)\s(.*)$', line)
+    if m is not None:
+        command = m.group(1)
+        args = m.group(2)
+
+    # login
+    if command == 'login':
+        email = ''
+        password = ''
+        if 'email' in core.Session.config and 'password' in core.Session.config:
+            email = core.Session.config['email']
+            password = core.Session.config['password']
+        if email == '':
+            print('Email: ', end='')
+            email = input()
+        if password == '':
+            password = getpass.getpass('Password: ')
+        backend.sign_in(email, password)
+
+    # exit
+    elif command == 'exit':
+        session.exit_completely()
+
+    # print
+    elif command == 'print':
+        if args is not None:
+            print(args)
+        else:
+            print()
+
+    # logout
+    elif command == 'logout':
+        backend.sign_out()
+
+    # undocumented, for development purposes
+    elif command == 'debug':
+        dev.debug(args)
+    elif command == 'dev':
+        dev.dev(args)
+
+    # unknown command
+    else:
+        print(f"{command}?")
+        print('   login')
+        print('   exit')
+        print('   print [text]')
 
 ################################################################################
 # start here
