@@ -11,6 +11,7 @@
 # See the LICENSE file in the project root for more information.
 ################################################################################
 
+import asyncio
 import getpass
 import re
 import sys
@@ -29,7 +30,7 @@ core.Main.version = 'v0.0.3'
 # command-line interface
 ################################################################################
 
-def prompt():
+async def prompt():
 
     def parse_dot_references(match):
         dot_ref = match.group(0)[1:]
@@ -45,23 +46,23 @@ def prompt():
             # prompt for auth/session input
             line = input(core.Session.prompt if core.Session.authenticated else core.Main.auth_prompt)
             line = re.sub(r'\.\w+', parse_dot_references, line)
-            parse(line)
+            await parse(line)
 
         # error handling
         except EOFError:
-            session.exit_completely(True)
+            await session.exit_completely(True)
         except KeyboardInterrupt:
-            session.exit_completely(True)
+            await session.exit_completely(True)
         except Exception as e: # pylint: disable=broad-exception-caught
             core.handle_error('prompt()', e)
 
         # detect terminated session
         try:
-            core.Session.supabase.auth.get_user()
+            await core.Session.supabase.auth.get_user()
         except: # pylint: disable=bare-except
             core.Session.authenticated = False
 
-def parse(line):
+async def parse(line):
     command = line
     args = None
     m = re.search(r'^(\S*)\s(.*)$', line)
@@ -81,11 +82,11 @@ def parse(line):
             email = input()
         if password == '':
             password = getpass.getpass('Password: ')
-        backend.sign_in(email, password)
+        await backend.sign_in(email, password)
 
     # exit
     elif command == 'exit':
-        session.exit_completely()
+        await session.exit_completely()
 
     # print
     elif command == 'print':
@@ -96,7 +97,7 @@ def parse(line):
 
     # logout
     elif command == 'logout':
-        backend.sign_out()
+        await backend.sign_out()
 
     # undocumented, for development purposes
     elif command == 'debug':
@@ -115,20 +116,30 @@ def parse(line):
 # start here
 ################################################################################
 
-# get default configuration
-session.get_config(['default.cfg'])
+async def main():
 
-# check for additional config file specification
-if len(sys.argv) > 1:
-    session.get_config(sys.argv[1:])
+    # get default configuration
+    session.get_config(['default.cfg'])
 
-core.show_info()
+    # check for additional config file specification
+    if len(sys.argv) > 1:
+        session.get_config(sys.argv[1:])
 
-# the supabase client module is required
-if backend.supabase_imported():
-    backend.connect()
-else:
-    core.info_print('Supabase client for Python is required:  https://github.com/supabase/supabase-py')
+    core.show_info()
 
-# get user input
-prompt()
+    # the Supabase client module is required
+    if backend.supabase_imported():
+        await backend.connect()
+    else:
+        core.info_print('Supabase client for Python is required:  https://github.com/supabase/supabase-py')
+
+    # get user input
+    try:
+        await prompt()
+    except: # pylint: disable=bare-except
+        pass
+
+try:
+    asyncio.run(main())
+except: # pylint: disable=bare-except
+    pass

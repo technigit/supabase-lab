@@ -16,8 +16,9 @@ try:
     REQUESTS_IMPORTED = True
 except ImportError:
     REQUESTS_IMPORTED = False
+from realtime._async.client import AsyncRealtimeClient
 try:
-    from supabase import create_client
+    from supabase import acreate_client
     SUPABASE_IMPORTED = True
 except ImportError:
     SUPABASE_IMPORTED = False
@@ -38,8 +39,8 @@ def supabase_imported():
 # connect to Supabase
 ################################################################################
 
-def connect():
-    # initialize the supabase client
+async def connect():
+    # initialize the Supabase client
     url = core.Session.url
     api_key = None
     if 'url' in core.Session.config:
@@ -53,7 +54,8 @@ def connect():
     core.Session.config['url'] = url
     core.Session.config['api_key'] = api_key
     try:
-        core.Session.supabase = create_client(url, api_key)
+        core.Session.supabase = await acreate_client(url, api_key)
+        core.Session.realtime = AsyncRealtimeClient(url, api_key)
         print('Ready to login.')
     except Exception as e: # pylint: disable=broad-exception-caught
         core.handle_error('connect()', e)
@@ -112,14 +114,14 @@ def show_response(response):
 # sign in the user using email/password authentication
 ################################################################################
 
-def sign_in(email, password):
+async def sign_in(email, password):
     if email == '' or password == '':
         print('Invalid email or password.')
         return
     print('Logging in...')
     response = None
     try:
-        response = core.Session.supabase.auth.sign_in_with_password({"email": email, "password": password})
+        response = await core.Session.supabase.auth.sign_in_with_password({"email": email, "password": password})
     except Exception as e: # pylint: disable=broad-exception-caught
         if response is not None:
             print(response)
@@ -141,8 +143,7 @@ def sign_in(email, password):
 # sign out
 ################################################################################
 
-def sign_out():
+async def sign_out():
     print('Logging out.')
-    core.Session.supabase.auth.sign_out({'scope': 'local'})
-    core.Session.jwt_token = None
+    await core.Session.supabase.auth.sign_out({'scope': 'local'})
     core.Session.authenticated = False

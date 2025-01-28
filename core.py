@@ -46,6 +46,7 @@ class Session():
     config_dir = 'config'   # default config directory
     prompt = '>> '          # session prompt after logging in
     supabase = None         # Supabase connection object
+    realtime = None         # Supabase realtime connection object
 
 ################################################################################
 # output functions

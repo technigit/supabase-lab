@@ -61,10 +61,10 @@ def get_config(config_files):
 # close the current session and exit the program
 ################################################################################
 
-def exit_completely(cr = False):
+async def exit_completely(cr = False):
     if cr:
         print('\r')
     if core.Session.authenticated:
-        backend.sign_out()
+        await backend.sign_out()
     print('Bye.')
     core.Main.running = False
