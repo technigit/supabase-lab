@@ -16,22 +16,38 @@ import getpass
 import re
 import sys
 
-# for interactive up/down arrow history
-import readline # pylint: disable=unused-import
+try:
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.output import ColorDepth
+    from prompt_toolkit.history import InMemoryHistory
+    PROMPT_TOOLKIT_IMPORTED = True
+except ImportError:
+    PROMPT_TOOLKIT_IMPORTED = False
 
 import backend
 import core
 import dev
 import session
 
-core.Main.version = 'v0.0.3'
+core.Main.version = 'v0.0.5'
+
+################################################################################
+# check for required imports
+################################################################################
+
+def prompt_toolkit_imported():
+    return PROMPT_TOOLKIT_IMPORTED
 
 ################################################################################
 # command-line interface
 ################################################################################
 
 async def prompt():
+    # prompt_toolkit setup
+    history = InMemoryHistory()
+    input_session = PromptSession(color_depth=ColorDepth.MONOCHROME, history=history)
 
+    # in-place substitutions with config values
     def parse_dot_references(match):
         dot_ref = match.group(0)[1:]
         ref_value = core.Session.config.get(dot_ref, match.group(0))
@@ -41,20 +57,13 @@ async def prompt():
             ref_value = '*' * len(ref_value)
         return ref_value
 
+    # main input loop
     while core.Main.running:
-        try:
-            # prompt for auth/session input
-            line = input(core.Session.prompt if core.Session.authenticated else core.Main.auth_prompt)
-            line = re.sub(r'\.\w+', parse_dot_references, line)
-            await parse(line)
-
-        # error handling
-        except EOFError:
-            await session.exit_completely(True)
-        except KeyboardInterrupt:
-            await session.exit_completely(True)
-        except Exception as e: # pylint: disable=broad-exception-caught
-            core.handle_error('prompt()', e)
+        # prompt for auth/session input
+        input_prompt = core.Session.prompt if core.Session.authenticated else core.Main.auth_prompt
+        line = await input_session.prompt_async(input_prompt)
+        line = re.sub(r'\.\w+', parse_dot_references, line)
+        await parse(line)
 
         # detect terminated session
         try:
@@ -128,18 +137,25 @@ async def main():
     core.show_info()
 
     # the Supabase client module is required
-    if backend.supabase_imported():
+    if backend.supabase_imported() and backend.realtime_imported():
         await backend.connect()
     else:
-        core.info_print('Supabase client for Python is required:  https://github.com/supabase/supabase-py')
+        if not backend.supabase_imported():
+            core.info_print('The Supabase client for Python is required:  https://github.com/supabase/supabase-py')
+        if not backend.realtime_imported():
+            core.info_print('The Realtime library is required:  https://github.com/supabase/realtime-py')
 
     # get user input
     try:
-        await prompt()
-    except: # pylint: disable=bare-except
-        pass
+        if prompt_toolkit_imported():
+            await prompt()
+        else:
+            core.info_print('The Prompt Toolkit library is required:  https://python-prompt-toolkit.readthedocs.io/')
+    except EOFError:
+        await session.exit_completely()
+    except KeyboardInterrupt:
+        await session.exit_completely()
+    except Exception as e: # pylint: disable=broad-exception-caught
+        core.handle_error('prompt()', e)
 
-try:
-    asyncio.run(main())
-except: # pylint: disable=bare-except
-    pass
+asyncio.run(main())

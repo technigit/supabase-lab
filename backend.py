@@ -12,11 +12,15 @@
 ################################################################################
 
 try:
+    from realtime._async.client import AsyncRealtimeClient
+    REALTIME_IMPORTED = True
+except ImportError:
+    REALTIME_IMPORTED = False
+try:
     import requests
     REQUESTS_IMPORTED = True
 except ImportError:
     REQUESTS_IMPORTED = False
-from realtime._async.client import AsyncRealtimeClient
 try:
     from supabase import acreate_client
     SUPABASE_IMPORTED = True
@@ -28,6 +32,9 @@ import core
 ################################################################################
 # check for required imports
 ################################################################################
+
+def realtime_imported():
+    return REALTIME_IMPORTED
 
 def requests_imported():
     return REQUESTS_IMPORTED
@@ -66,7 +73,7 @@ async def connect():
 
 def edge_function(url, payload):
     if not requests_imported():
-        core.info_print('The Requests library is required: https://requests.readthedocs.io/en/latest/')
+        core.info_print('The Requests library is required: https://requests.readthedocs.io/')
         return
     headers = {
         "Authorization": f"Bearer {core.Session.jwt_token}",

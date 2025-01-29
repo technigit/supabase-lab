@@ -20,7 +20,6 @@ import core
 # non-printable null character for internal parsing
 SPACE_DELIM = '\x00'
 
-
 ################################################################################
 # get session configuration values
 ################################################################################
@@ -61,9 +60,7 @@ def get_config(config_files):
 # close the current session and exit the program
 ################################################################################
 
-async def exit_completely(cr = False):
-    if cr:
-        print('\r')
+async def exit_completely():
     if core.Session.authenticated:
         await backend.sign_out()
     print('Bye.')
