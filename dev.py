@@ -12,13 +12,18 @@
 ################################################################################
 
 import ast
+import asyncio
 import re
+import threading
 
 import backend
 import core
 
 # non-printable null character for internal parsing
 SPACE_DELIM = '\x00'
+
+# time suffix translation into multipliers
+TIME_SUFFIX_DICT = {'': 1, 's': 1, 'm': 60, 'h': 60 * 60}
 
 ################################################################################
 # explore supabase object for development purposes
@@ -76,7 +81,105 @@ def edge(args = None):
 def ping(args = None):
     print(f"ping {args}")
 
-def dev(args = None):
+def beeping(beep_id, status = None):
+    if beep_id is not None and status is not None:
+        core.Session.config['beeping'][beep_id] = status
+    elif beep_id is None:
+        for key in core.Session.config['beeping']:
+            core.Session.config['beeping'][key] = False
+    else:
+        status = core.Session.config['beeping'][beep_id]
+    return status
+
+def get_beep_id():
+    if 'beeping' not in core.Session.config:
+        core.Session.config['beeping'] = {}
+    beep_id = 0
+    while True:
+        if beep_id not in core.Session.config['beeping']:
+            break
+        beep_id += 1
+    return beep_id
+
+def del_beep_id(beep_id):
+    if beep_id in core.Session.config['beeping']:
+        del core.Session.config['beeping'][beep_id]
+
+async def run_beep(beep_id, beep_message, beep_interval):
+    beep_seq = 1
+    try:
+        while beeping(beep_id):
+            print(f"{beep_id}: beep_seq={beep_seq} {beep_message}")
+            beep_seq += 1
+            core.Session.prompt_app.invalidate()
+            await asyncio.sleep(beep_interval)
+    except asyncio.CancelledError:
+        pass
+
+async def beep(args = None):
+    #check for beep stop
+    args = args.strip()
+    m = re.match(r'^stop (\d*)$', args)
+    if m is not None:
+        beep_id = int(m.group(1))
+        beeping(beep_id, False)
+        return
+    if args == 'stop':
+        beeping(None)
+        return
+
+    # get beep parameters
+    beep_id = get_beep_id()
+    beeping(beep_id, True)
+    beep_interval = '1'
+    beep_duration = '10'
+    beep_message = 'beep'
+    float_regex = r'(\d+(\.\d+)?|\.\d+)' # match an int string or a float string
+    time_suffix_regex = r'[smhSMH]?'
+    m = re.match(rf'^({float_regex}{time_suffix_regex})\s+({float_regex}{time_suffix_regex})\s+(\S.*)$', args)
+    if m is not None:
+        beep_interval = m.group(1)
+        beep_duration = m.group(4)
+        beep_message = m.group(7)
+    else:
+        m = re.match(rf'^({float_regex}{time_suffix_regex})\s+({float_regex}{time_suffix_regex})$', args)
+        if m is not None:
+            beep_interval = m.group(1)
+            beep_duration = m.group(4)
+        else:
+            m = re.match(rf'^({float_regex}{time_suffix_regex})\s+([^\d\s].*)$', args)
+            if m is not None:
+                beep_interval = m.group(1)
+                beep_message = m.group(7)
+            else:
+                m = re.match(rf'^({float_regex}{time_suffix_regex})$', args)
+                if m is not None:
+                    beep_interval = m.group(1)
+
+    # parse beep time suffixes
+    m = re.match(rf'^(\d*)({time_suffix_regex})$', beep_interval)
+    if m is not None:
+        time_suffix = m.group(2)
+        beep_interval = float(m.group(1)) * TIME_SUFFIX_DICT[time_suffix]
+    m = re.match(rf'^(\d*)({time_suffix_regex})$', beep_duration)
+    if m is not None:
+        time_suffix = m.group(2)
+        beep_duration = float(m.group(1)) * TIME_SUFFIX_DICT[time_suffix]
+
+    # start beeping
+    beep_task = asyncio.create_task(run_beep(beep_id, beep_message, beep_interval))
+
+    # sleep while beeping
+    try:
+        if beeping(beep_id):
+            await asyncio.sleep(beep_duration)
+    finally:
+        beep_task.cancel()
+        beeping(beep_id, False)
+        await beep_task
+        del_beep_id(beep_id)
+
+async def dev(args = None):
     if args is None:
         print('dev?')
         print('   explore [args]')
@@ -89,6 +192,8 @@ def dev(args = None):
         args = m.group(2)
     if experiment == 'explore':
         explore(args)
+    elif experiment == 'beep':
+        asyncio.create_task(beep(args))
     elif experiment == 'edge':
         edge(args)
     elif experiment == 'ping':
@@ -125,3 +230,17 @@ def debug(args = ''):
     if 'config' in filter_list or no_filters:
         print('config:')
         core.print_item(core.Session.config, '   ')
+    if 'tasks' in filter_list:
+        list_tasks()
+    if 'threads' in filter_list:
+        list_threads()
+
+def list_tasks():
+    print('\nTasks:')
+    for task in asyncio.all_tasks():
+        print(f"   {task}")
+
+def list_threads():
+    print('\nThreads:')
+    for thread in threading.enumerate():
+        print(f"   {thread.name}")
