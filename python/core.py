@@ -24,10 +24,10 @@ class Main():
     base_dir = os.path.dirname(os.path.abspath(__file__))
 
     # general settings
-    auth_prompt = '> '      # authentication prompt before logging in
-    running = True          # accepting auth/session input
-    verbose = False         # extra output for debugging
-    version = ''            # version set from lab.py
+    auth_prompt = '> '         # authentication prompt before logging in
+    running = True             # accepting auth/session input
+    verbose = False            # extra output for debugging
+    version = ''               # version set from lab.py
 
 ################################################################################
 # all session values are accessed here
@@ -41,13 +41,13 @@ class Session():
     jwt_token = None
 
     # session settings
-    authenticated = False   # authentication status
-    config = {}             # configuration values
-    config_dir = 'config'   # default config directory
-    prompt_app = None       # prompt_toolkit Application object
-    prompt = '>> '          # session prompt after logging in
-    supabase = None         # Supabase connection object
-    realtime = None         # Supabase realtime connection object
+    authenticated = False      # authentication status
+    config = {}                # configuration values
+    config_dir = '../config'   # default config directory
+    prompt_app = None          # prompt_toolkit Application object
+    prompt = '>> '             # session prompt after logging in
+    supabase = None            # Supabase connection object
+    realtime = None            # Supabase realtime connection object
 
 ################################################################################
 # output functions
