@@ -32,8 +32,8 @@ async function get_config(configFiles) {
         if (line.startsWith('#') || line == '') {
           continue;
         }
-        var key = null;
-        var value = null;
+        let key = null;
+        let value = null;
         let m = line.match(/^(\S*)\s*=\s*(.*)$/);
         if (!m) {
           m = line.match(/^(\S*)\s*=()$/);
@@ -55,11 +55,15 @@ async function get_config(configFiles) {
             core.Session.config[key] = value;
           }
         } else {
-          console.log(`${line}?`);
+          core.writeln(`${line}?`);
         }
       }
-    } catch (err) {
-      console.error(`Error reading file ${filePath}:`, err);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        core.error_print(`File not found: ${file}`);
+      } else {
+        console.error(`Error reading file ${file}:`, error);
+      }
     }
   }
 }
@@ -68,8 +72,8 @@ async function exit_completely() {
   if (core.Session.authenticated) {
     backend.sign_out();
   }
-  console.log('Bye.');
-  core.Main.running = false;
+  core.writeln('Bye.');
+  process.exit(0);
 }
 
 module.exports.get_config = get_config;

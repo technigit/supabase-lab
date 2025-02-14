@@ -21,15 +21,15 @@ const core = require('./core');
 
 const connect = async () => {
   // initialize the Supabase client
-  var url = core.Session.url;
-  var api_key = null;
+  let url = core.Session.url;
+  let api_key = null;
   if ('url' in core.Session.config) {
     url = core.Session.config['url'];
   }
   if ('api_key' in core.Session.config) {
     api_key = core.Session.config['api_key'];
   }
-  console.log(`Connecting to ${url}`);
+  core.writeln(`Connecting to ${url}`);
   if (api_key == null) {
     core.error_print('No api_key configuration found.');
     return;
@@ -38,9 +38,9 @@ const connect = async () => {
   core.Session.config['api_key'] = api_key;
   try {
     core.Session.supabase = createClient(url, api_key);
-    console.log('Ready to login.');
-  } catch (e) {
-    core.handle_error('connect', e, true);
+    core.writeln('Ready to login.');
+  } catch (error) {
+    core.handle_error('connect', error, true);
   }
 };
 
@@ -49,25 +49,22 @@ const connect = async () => {
 ////////////////////////////////////////////////////////////////////////////////
 
 const edge_function = async (url, payload) => {
-  var headers = {
+  let headers = {
     "Authorization": `Bearer ${core.Session.jwt_token}`,
     "Content-Type": "application/json"
   };
-  axios.post(url, payload, { headers: headers, timeout: 10000 })
+  axios.post(url, payload, { headers: headers, timeout: 5000 })
     .then(response => {
       if (core.verbose()) {
         show_response(response);
       } else {
-        console.log(response.data);
+        core.writeln(response.data);
       }
     })
     .catch(error => {
-      if (error.response) {
-        console.log('Response error:', error.response.data); // Response error
-      } else if (error.request) {
-        console.log('Request error:', error.request); // Request error
-      } else {
-        console.log('Error:', error.message); // Other errors
+      core.error_print(`Axios error: ${error.message}`);
+      if (error.code) {
+        core.error_print(`Axios error code: ${error.code}`);
       }
     });
 };
@@ -77,17 +74,17 @@ const edge_function = async (url, payload) => {
 ////////////////////////////////////////////////////////////////////////////////
 
 function show_response(response) {
-  console.log(`Response URL: ${response.config.url}`);
-  console.log(`Status Code: ${response.status}`);
-  console.log(`Status Text: ${response.statusText}`);
-  console.log(`Request Method: ${response.request.method}`);
-  console.log('Response Data:');
+  core.writeln(`Response URL: ${response.config.url}`);
+  core.writeln(`Status Code: ${response.status}`);
+  core.writeln(`Status Text: ${response.statusText}`);
+  core.writeln(`Request Method: ${response.request.method}`);
+  core.writeln('Response Data:');
   for (let key in response.data) {
-    console.log(`   ${key}: ${response.data[key]}`);
+    core.writeln(`   ${key}: ${response.data[key]}`);
   }  
-  console.log('Response Headers:');
+  core.writeln('Response Headers:');
   for (let key in response.headers) {
-    console.log(`   ${key}: ${response.headers[key]}`);
+    core.writeln(`   ${key}: ${response.headers[key]}`);
   }  
 }
 
@@ -97,10 +94,10 @@ function show_response(response) {
 
 const sign_in = async (email, password) => {
   if (email == '' || password == '') {
-    console.log('Invalid email or password.');
+    core.writeln('Invalid email or password.');
     return;
   }
-  console.log('Logging in...');
+  core.writeln('Logging in...');
 
   try {
     const { data, error } = await core.Session.supabase.auth.signInWithPassword({ email: email, password: password });
@@ -108,14 +105,19 @@ const sign_in = async (email, password) => {
       console.error('Login failed:', error.message);
     } else {
       core.Session.jwt_token = data.session.access_token;
-      var session_user_email = data.session.user.email;
-      var last_sign_in_at = core.show_time(data.user.last_sign_in_at);
-      console.log(`${session_user_email} logged in.`);
-      console.log(`Last login: ${last_sign_in_at}`);
+      let session_user_email = data.session.user.email;
+      let last_sign_in_at = core.show_time(data.user.last_sign_in_at);
       core.Session.authenticated = true;
+      core.update_prompt();
+      core.writeln(`${session_user_email} logged in.`);
+      core.writeln(`Last login: ${last_sign_in_at}`);
     }
-  } catch (e) {
-    console.error('Unexpected error:', e);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      core.writeln(error.message);
+    } else {
+      console.error('Unexpected error:', error);
+    }
   }
 };
 
@@ -124,7 +126,7 @@ const sign_in = async (email, password) => {
 ////////////////////////////////////////////////////////////////////////////////
 
 const sign_out = async () => {
-  console.log('Logging out.');
+  core.writeln('Logging out.');
   core.Session.supabase.auth.signOut();
   core.Session.jwt_token = null;
   core.Session.authenticated = false;

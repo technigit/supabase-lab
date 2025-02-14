@@ -16,9 +16,7 @@ const backend = require('./backend');
 const session = require('./session');
 const dev = require('./dev');
 
-const readline = require('readline');
-
-core.Main.version = 'v0.0.5js';
+core.Main.version = 'v0.0.6js';
 
 ////////////////////////////////////////////////////////////////////////////////
 // command-line interface
@@ -26,28 +24,11 @@ core.Main.version = 'v0.0.5js';
 
 let exit_command = false;
 
-// readline interface
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-
-// central input loop
-const prompt = async () => {
-  return new Promise((resolve) => {
-    // prompt for auth/session input
-    rl.question(core.Session.authenticated ? core.Session.prompt : core.Main.auth_prompt, async (line) => {
-      await parse(line);
-      resolve(line);
-    });
-  });
-};
-
 const parse = async (line) => {
 
   function parse_dot_references(match) {
-    var dot_ref = match.slice(1);
-    var ref_value = core.Session.config[dot_ref] ?? match;
+    let dot_ref = match.slice(1);
+    let ref_value = core.Session.config[dot_ref] ?? match;
     if (typeof ref_value === 'boolean') {
       ref_value = String(ref_value);
     }
@@ -57,10 +38,34 @@ const parse = async (line) => {
     return ref_value;
   }
 
+  // prompt for email
+  function email_prompt(prompt) {
+    return new Promise((resolve) => {
+        core.Session.rl.question(prompt, (email) => {
+            resolve(email);
+        });
+    });
+  }
+
+  // prompt for password
+  function password_prompt(prompt) {
+    return new Promise((resolve) => {
+        process.stdout.write(prompt);
+        const psw = process.stdout.write;
+        process.stdout.write = () => {};
+        core.Session.rl.question(prompt, (password) => {
+            process.stdout.write = psw;
+            process.stdout.write('\n');
+            resolve(password);
+        });
+    });
+  }
+
 // parse input
+  core.Session.current_input = ''; // clear input for next prompt
   line = line.replace(/\.\w+/g, parse_dot_references);
-  var command = line;
-  var args = '';
+  let command = line;
+  let args = '';
   const m = line.match(/^(\S*)\s(.*)$/);
   if (m) {
     command = m[1];
@@ -69,55 +74,96 @@ const parse = async (line) => {
 
   switch (command) {
     // login
-    case 'login':
-      var email = '';
-      var password = '';
+    case 'login': {
+      let email = '';
+      let password = '';
       if ('email' in core.Session.config && 'password' in core.Session.config) {
         email = core.Session.config['email'];
         password = core.Session.config['password'];
       }
       if (email == '') {
-        console.log('Email:');
+        email = await email_prompt('Email: ');
       }
       if (password == '' ) {
-        console.log('Password:');
+        password = await password_prompt('Password: ');
       }
       await backend.sign_in(email, password);
+      core.update_prompt();
       break;
+    }
 
     // exit
-    case 'exit':
+    case 'exit': {
       exit_command = true;
-      rl.close();
+      core.Session.rl.close();
       break;
+    }
 
     // print
-    case 'print':
+    case 'print': {
       if (args) {
-        console.log(args);
+        core.writeln(args);
       } else {
-        console.log();
+        core.writeln();
       }
       break;
+    }
 
     // logout
-    case 'logout':
+    case 'logout': {
       backend.sign_out();
       break;
+    }
 
     // undocumented, for development purposes
-    case 'debug':
+    case 'debug': {
       dev.debug(args);
       break;
-    case 'dev':
+    }
+    case 'dev': {
       await dev.dev(args);
       break;
+    }
 
     // unknown command
-    default:
-      console.log('?\n   login\n   exit\n   print [text]');
+    default: {
+      core.writeln('?\n   login\n   exit\n   print [text]');
+    }
   }
 };
+
+////////////////////////////////////////////////////////////////////////////////
+// readline processing
+////////////////////////////////////////////////////////////////////////////////
+
+// get user input
+core.Session.rl.on('line', async (line) => {
+  await parse(line);
+  core.show_prompt(core.Session.rl);
+});
+
+// handle special keys during input
+core.Session.rl.input.on('keypress', (char, key) => {
+  if (key.name === 'backspace') {
+    core.Session.current_input = core.Session.current_input.slice(0, -1);
+  } else if (key.ctrl && key.name === 'u') {
+    core.Session.current_input = '';
+  } else if ((key.name == 'up') || (key.name === 'down')) {
+    core.Session.current_input = core.Session.rl.line;
+  } else if (char && char.length === 1 && /^[\x20-\x7E]$/.test(char)) {
+    core.Session.current_input += char;
+  } else if (key.name === 'return') {
+    // EOL
+  }
+});
+
+// handle session closure
+core.Session.rl.on('close', () => {
+  if (!exit_command) {
+    core.writeln();
+  }
+  session.exit_completely();
+});
 
 ////////////////////////////////////////////////////////////////////////////////
 // start here
@@ -138,24 +184,6 @@ const main = async () => {
   
   // get Supabase connection
   await backend.connect();
-  
-  // handle session closure
-  rl.on('close', () => {
-    if (!exit_command) {
-      console.log();
-    }
-    session.exit_completely();
-  });
-  try {
-    while (core.Main.running) {
-      await prompt();
-    }
-  } catch (e) {
-    core.handle_error('core', e);
-  } finally {
-    rl.close();
-  }
 };
 
-// get user input
-main().catch(error => console.error(error));
+main();
