@@ -17,8 +17,9 @@ import re
 import sys
 
 try:
-    from prompt_toolkit import PromptSession
+    from prompt_toolkit import PromptSession, Application
     from prompt_toolkit.output import ColorDepth
+    from prompt_toolkit.patch_stdout import patch_stdout
     from prompt_toolkit.history import InMemoryHistory
     PROMPT_TOOLKIT_IMPORTED = True
 except ImportError:
@@ -29,7 +30,7 @@ import core
 import dev
 import session
 
-core.Main.version = 'v0.0.5'
+core.Main.version = 'v0.0.6'
 
 ################################################################################
 # check for required imports
@@ -44,6 +45,7 @@ def prompt_toolkit_imported():
 
 async def prompt():
     # prompt_toolkit setup
+    core.Session.prompt_app = Application()
     history = InMemoryHistory()
     input_session = PromptSession(color_depth=ColorDepth.MONOCHROME, history=history)
 
@@ -79,8 +81,12 @@ async def parse(line):
         command = m.group(1)
         args = m.group(2)
 
+    # nothing
+    if command.strip() == '':
+        return
+
     # login
-    if command == 'login':
+    elif command == 'login':
         email = ''
         password = ''
         if 'email' in core.Session.config and 'password' in core.Session.config:
@@ -112,7 +118,7 @@ async def parse(line):
     elif command == 'debug':
         dev.debug(args)
     elif command == 'dev':
-        dev.dev(args)
+        await dev.dev(args)
 
     # unknown command
     else:
@@ -158,4 +164,5 @@ async def main():
     except Exception as e: # pylint: disable=broad-exception-caught
         core.handle_error('prompt()', e)
 
-asyncio.run(main())
+with patch_stdout():
+    asyncio.run(main())
