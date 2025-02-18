@@ -31,7 +31,7 @@ const connect = async () => {
   }
   core.writeln(`Connecting to ${url}`);
   if (api_key == null) {
-    core.error_print('No api_key configuration found.');
+    core.supabase_error_print('No api_key configuration found.');
     return;
   }
   core.Session.config['url'] = url;
@@ -62,9 +62,9 @@ const edge_function = async (url, payload) => {
       }
     })
     .catch(error => {
-      core.error_print(`Axios error: ${error.message}`);
+      core.supabase_error_print(`Axios error: ${error.message}`);
       if (error.code) {
-        core.error_print(`Axios error code: ${error.code}`);
+        core.supabase_error_print(`Axios error code: ${error.code}`);
       }
     });
 };
@@ -102,7 +102,7 @@ const sign_in = async (email, password) => {
   try {
     const { data, error } = await core.Session.supabase.auth.signInWithPassword({ email: email, password: password });
     if (error) {
-      console.error('Login failed:', error.message);
+      core.supabase_error_print(`Login failed: ${error.message}`);
     } else {
       core.Session.jwt_token = data.session.access_token;
       let session_user_email = data.session.user.email;
@@ -114,9 +114,9 @@ const sign_in = async (email, password) => {
     }
   } catch (error) {
     if (error instanceof TypeError) {
-      core.writeln(error.message);
+      core.supabase_error_print(error.message);
     } else {
-      console.error('Unexpected error:', error);
+      core.supabase_error_print('Unexpected error:', error);
     }
   }
 };

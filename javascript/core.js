@@ -108,10 +108,14 @@ function error_print(message) {
   writeln(`<E> ${message}`);
 }
 
+function supabase_error_print(message) {
+  writeln(`<S> ${message}`);
+}
+
 function handle_error(message, e, force_verbose = false) {
-  writeln(`${message}: ${e.name}: ${e.message}`);
+  error_print(`${message}: ${e.name}: ${e.message}`);
   if (verbose() || force_verbose) {
-    console.error(e.stack);
+    error_print(e.stack);
   }
 }
 
@@ -158,6 +162,7 @@ module.exports.show_info = show_info;
 module.exports.show_time = show_time;
 module.exports.info_print = info_print;
 module.exports.error_print = error_print;
+module.exports.supabase_error_print = supabase_error_print;
 module.exports.handle_error = handle_error;
 module.exports.print_item = print_item;
 module.exports.verbose = verbose;

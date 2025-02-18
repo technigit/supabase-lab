@@ -29,11 +29,15 @@ let task_monitors = {};
 ////////////////////////////////////////////////////////////////////////////////
 
 const explore = async () => {
-  const { data, error } = await core.Session.supabase.auth.getSession();
-  if (error) {
-    core.handle_error('dev explore', error);
+  if (core.Session.authenticated) {
+    const { data, error } = await core.Session.supabase.auth.getSession();
+    if (error) {
+      core.handle_error('dev explore', error);
+    } else {
+      core.writeln(data);
+    }
   } else {
-    core.writeln(data);
+    core.writeln('login?');
   }
 };
 
