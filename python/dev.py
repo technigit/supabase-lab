@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 ################################################################################
 #
 # Supabase Lab
@@ -29,10 +27,11 @@ TIME_SUFFIX_DICT = {'': 1, 's': 1, 'm': 60, 'h': 60 * 60}
 # explore supabase object for development purposes
 ################################################################################
 
-def explore(args = None):
+async def explore(args = None):
     if core.Session.authenticated:
         try:
-            data = core.Session.supabase.auth.get_session().model_dump()
+            gs = await core.Session.supabase.auth.get_session()
+            data = gs.model_dump()
             found = True
             if args is not None:
                 found = False
@@ -191,7 +190,7 @@ async def dev(args = None):
         experiment = m.group(1)
         args = m.group(2)
     if experiment == 'explore':
-        explore(args)
+        await explore(args)
     elif experiment == 'beep':
         asyncio.create_task(beep(args))
     elif experiment == 'edge':

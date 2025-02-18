@@ -30,7 +30,7 @@ import core
 import dev
 import session
 
-core.Main.version = 'v0.0.6'
+core.Main.version = 'v0.0.7py'
 
 ################################################################################
 # check for required imports
@@ -133,30 +133,12 @@ async def parse(line):
 
 async def main():
 
-    # get default configuration
-    session.get_config(['default.cfg'])
-
-    # check for additional config file specification
-    if len(sys.argv) > 1:
-        session.get_config(sys.argv[1:])
-
-    core.show_info()
-
-    # the Supabase client module is required
-    if backend.supabase_imported() and backend.realtime_imported():
-        await backend.connect()
-    else:
-        if not backend.supabase_imported():
-            core.info_print('The Supabase client for Python is required:  https://github.com/supabase/supabase-py')
-        if not backend.realtime_imported():
-            core.info_print('The Realtime library is required:  https://github.com/supabase/realtime-py')
+    # set up initial supabase connection
+    await backend.connect()
 
     # get user input
     try:
-        if prompt_toolkit_imported():
-            await prompt()
-        else:
-            core.info_print('The Prompt Toolkit library is required:  https://python-prompt-toolkit.readthedocs.io/')
+        await prompt()
     except EOFError:
         await session.exit_completely()
     except KeyboardInterrupt:
@@ -164,5 +146,30 @@ async def main():
     except Exception as e: # pylint: disable=broad-exception-caught
         core.handle_error('prompt()', e)
 
-with patch_stdout():
-    asyncio.run(main())
+# get default configuration
+session.get_config(['default.cfg'])
+
+# check for additional config file specification
+if len(sys.argv) > 1:
+    session.get_config(sys.argv[1:])
+
+# show Supabase Lab information
+core.show_info()
+
+# check Python dependencies
+if backend.supabase_imported() and backend.realtime_imported() and prompt_toolkit_imported():
+
+    # start command-line interface
+    with patch_stdout():
+        asyncio.run(main())
+
+# provide dependency guidance
+else:
+    if not backend.supabase_imported():
+        core.info_print('The Supabase client for Python is required:  https://github.com/supabase/supabase-py')
+    if not backend.realtime_imported():
+        core.info_print('The Realtime library is required:  https://github.com/supabase/realtime-py')
+    if not prompt_toolkit_imported():
+        core.info_print('The Prompt Toolkit library is required:  https://python-prompt-toolkit.readthedocs.io/')
+    if not backend.requests_imported():
+        core.info_print('The Requests library may be required: https://requests.readthedocs.io/')

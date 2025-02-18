@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 ################################################################################
 #
 # Supabase Lab
@@ -56,7 +54,7 @@ async def connect():
         api_key = core.Session.config['api_key']
     print(f"Connecting to {url}")
     if api_key is None:
-        core.error_print('No api_key configuration found.')
+        core.supabase_error_print('No api_key configuration found.')
         return
     core.Session.config['url'] = url
     core.Session.config['api_key'] = api_key
@@ -131,10 +129,10 @@ async def sign_in(email, password):
         response = await core.Session.supabase.auth.sign_in_with_password({"email": email, "password": password})
     except Exception as e: # pylint: disable=broad-exception-caught
         if response is not None:
-            print(response)
+            core.supabase_error_print(response)
         else:
-            print('No response received.')
-        print(f"sign_in({email}, {'*' * min(len(password), 8)}):", e)
+            core.supabase_error_print('No response received.')
+        core.supabase_error_print(f"sign_in({email}, {'*' * min(len(password), 8)}): {e}")
         core.Session.authenticated = False
 
     # get JWT token and greet user
@@ -153,4 +151,5 @@ async def sign_in(email, password):
 async def sign_out():
     print('Logging out.')
     await core.Session.supabase.auth.sign_out({'scope': 'local'})
+    core.Session.jwt_token = None
     core.Session.authenticated = False
