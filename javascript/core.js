@@ -45,6 +45,7 @@ class Session {
   static config_dir = '../config';  // default config directory
   static prompt = '>> ';            // session prompt after logging in
   static supabase = null;           // Supabase connection object
+  static subscriptions = {};        // Supabase subscriptions
   static current_input = '';        // asynchronous input line buffer
   
   // user input handler

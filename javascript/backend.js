@@ -70,6 +70,116 @@ const edge_function = async (url, payload) => {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
+// subscribe to a channel
+////////////////////////////////////////////////////////////////////////////////
+
+async function subscribe_channel(channel_name) {
+  const subscription = core.Session.supabase.channel(channel_name);
+  subscription
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        core.writeln(`Subscribed channel: ${channel_name}`);
+      } else if (status === 'CLOSED') {
+        core.writeln(`Closed channel: ${channel_name}`);
+      } else if (status === 'RECONNECTING') {
+        core.writeln(`Reconnecting to channel: ${channel_name}`);
+      } else if (status === 'ERROR') {
+        core.supabase_error_print(`Error subscribing to channel: ${channel_name}`);
+      }
+    });
+  register_channel(channel_name, subscription);
+  return subscription;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// unsubscribe from a channel
+////////////////////////////////////////////////////////////////////////////////
+
+async function unsubscribe_channel(channel_name) {
+  const subscription = core.Session.subscriptions[channel_name];
+  if (subscription) {
+    const { error: unsubscribeError } = await subscription.unsubscribe();
+    if (unsubscribeError) {
+      core.supabase_error_print(unsubscribeError);
+    } else {
+      delete core.Session.subscriptions[channel_name];
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// register a channel for later reference
+////////////////////////////////////////////////////////////////////////////////
+
+function register_channel(channel_name, subscription) {
+  if (subscription) {
+    core.Session.subscriptions[channel_name] = subscription;
+  } else {
+    core.supabase_error_print(`${channel_name}: Invalid subscription object.`);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// list registered channels
+////////////////////////////////////////////////////////////////////////////////
+
+async function list_channels() {
+  for (let channel_name in core.Session.subscriptions) {
+    core.writeln(channel_name);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// listen for broadcast messages on a channel
+////////////////////////////////////////////////////////////////////////////////
+
+async function listen_to_broadcast_channel(channel_name, event) {
+  const subscription = await subscribe_channel(channel_name);
+  subscription
+    .on('broadcast', { event: event }, (payload) => {
+      core.writeln(`FROM ${channel_name}: ${JSON.stringify(payload)}`);
+    });
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// send broadcast message on a channel
+////////////////////////////////////////////////////////////////////////////////
+
+async function send_to_broadcast_channel(channel_name, event, message_text) {
+  if (message_text == '' || !message_text) {
+    core.error_print('Empty message not sent.');
+    return;
+  }
+  const message = {
+    type: 'broadcast',
+    event: event,
+    payload: {
+      message: message_text,
+    }
+  };
+  core.Session.supabase.channel(channel_name).send(message);
+  core.writeln(`TO ${channel_name}: ${JSON.stringify(message)}`);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// listen for database table changes
+////////////////////////////////////////////////////////////////////////////////
+
+const listen_to_table = async (table_name) => {
+  core.Session.supabase
+    .channel('table_changes')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: table_name },
+      (payload) => {
+        core.writeln(payload);
+      }
+    )
+    .subscribe();
+  core.writeln(`Listening for changes on table: ${table_name}`);
+};
+
+////////////////////////////////////////////////////////////////////////////////
 // display response values after sending a request to Supabase
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -134,5 +244,12 @@ const sign_out = async () => {
 
 module.exports.connect = connect;
 module.exports.edge_function = edge_function;
+module.exports.subscribe_channel = subscribe_channel;
+module.exports.unsubscribe_channel = unsubscribe_channel;
+module.exports.register_channel = register_channel;
+module.exports.list_channels = list_channels;
+module.exports.listen_to_broadcast_channel = listen_to_broadcast_channel;
+module.exports.send_to_broadcast_channel = send_to_broadcast_channel;
+module.exports.listen_to_table = listen_to_table;
 module.exports.sign_in = sign_in;
 module.exports.sign_out = sign_out;
