@@ -100,6 +100,24 @@ const schan = async (args) => {
   await backend.send_to_broadcast_channel(channel, event, message);
 };
 
+// sync and track presence state
+const tpres = async (args) => {
+  const channel_name = args.trim();
+  backend.sync_track_presence(channel_name);
+};
+
+// send presence state
+const spres = async (args) => {
+  const channel_name = args.trim();
+  backend.send_presence(channel_name);
+};
+
+// stop tracking presence state
+const stpres = async (args) => {
+  const channel_name = args.trim();
+  backend.stop_presence(channel_name);
+};
+
 // listen to table
 const ldb = async (args) => {
   await backend.listen_to_table(args.trim());
@@ -296,6 +314,12 @@ const dev = async (args) => {
     await lchan(args);
   } else if (experiment == 'sendchan' || experiment == 'schan') {
     await schan(args);
+  } else if (experiment == 'trackpresence' || experiment == 'tpres') {
+    await tpres(args);
+  } else if (experiment == 'sendpresence' || experiment == 'spres') {
+    await spres(args);
+  } else if (experiment == 'stoptrackpresence' || experiment == 'stpres') {
+    await stpres(args);
   } else if (experiment == 'listendb' || experiment == 'ldb') {
     await ldb(args);
   } else if (experiment == 'ping') {

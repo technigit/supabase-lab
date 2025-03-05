@@ -162,6 +162,56 @@ async function send_to_broadcast_channel(channel_name, event, message_text) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// listen for presence signals on a channel
+////////////////////////////////////////////////////////////////////////////////
+
+async function sync_track_presence(channel_name) {
+  let channel = core.Session.subscriptions[channel_name];
+  if (!channel) {
+    channel = await subscribe_channel(channel_name);
+  }
+  channel
+    .on('presence', { event: 'sync' }, () => {
+      const newState = channel.presenceState();
+      core.writeln(`sync ${JSON.stringify(newState, null, 2)}`);
+    })
+    .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+      core.writeln(`join ${key} ${JSON.stringify(newPresences, null, 2)}`);
+    })
+    .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+      core.writeln(`leave ${key} ${JSON.stringify(leftPresences, null, 2)}`);
+    });
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// send presence state on a channel
+////////////////////////////////////////////////////////////////////////////////
+
+async function send_presence(channel_name) {
+  let channel = core.Session.subscriptions[channel_name];
+  if (!channel) {
+    channel = await subscribe_channel(channel_name);
+  }
+  const userStatus = {
+    user: core.Session.config['email'],
+    online_at: new Date().toISOString(),
+  };
+  const presenceTrackStatus = await channel.track(userStatus);
+  core.writeln(JSON.stringify(presenceTrackStatus, null, 2));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// stop presence tracking on a channel
+////////////////////////////////////////////////////////////////////////////////
+
+async function stop_presence(channel_name) {
+  const channel = core.Session.subscriptions[channel_name];
+  if (channel) {
+    channel.untrack();
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // listen for database table changes
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -250,6 +300,9 @@ module.exports.register_channel = register_channel;
 module.exports.list_channels = list_channels;
 module.exports.listen_to_broadcast_channel = listen_to_broadcast_channel;
 module.exports.send_to_broadcast_channel = send_to_broadcast_channel;
+module.exports.sync_track_presence = sync_track_presence;
+module.exports.send_presence = send_presence;
+module.exports.stop_presence = stop_presence;
 module.exports.listen_to_table = listen_to_table;
 module.exports.sign_in = sign_in;
 module.exports.sign_out = sign_out;
