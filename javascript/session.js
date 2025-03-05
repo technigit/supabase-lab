@@ -62,7 +62,7 @@ async function get_config(configFiles) {
       if (error.code === 'ENOENT') {
         core.error_print(`File not found: ${file}`);
       } else {
-        console.error(`Error reading file ${file}:`, error);
+        core.error_print(`Error reading file ${file}: ${error}`);
       }
     }
   }

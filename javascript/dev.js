@@ -29,11 +29,15 @@ let task_monitors = {};
 ////////////////////////////////////////////////////////////////////////////////
 
 const explore = async () => {
-  const { data, error } = await core.Session.supabase.auth.getSession();
-  if (error) {
-    core.handle_error('dev explore', error);
+  if (core.Session.authenticated) {
+    const { data, error } = await core.Session.supabase.auth.getSession();
+    if (error) {
+      core.handle_error('dev explore', error);
+    } else {
+      core.writeln(data);
+    }
   } else {
-    core.writeln(data);
+    core.writeln('login?');
   }
 };
 
@@ -61,8 +65,65 @@ const ping = async (args) => {
   core.writeln(`ping ${args}`);
 };
 
-// beep
+// subscribe to channel
+const sub = async (args) => {
+  const channel_name = args.trim();
+  const channel = await backend.subscribe_channel(channel_name);
+  backend.register_channel(channel_name, channel);
+};
 
+// unsubscribe from channel
+const unsub = async (args) => {
+  const channel_name = args.trim();
+  await backend.unsubscribe_channel(channel_name);
+};
+
+// list channels
+const lschan = async () => {
+  await backend.list_channels();
+};
+
+// listen to broadcast channel
+const lchan = async (args) => {
+  const arg_strings = parse_args(args);
+  const channel = arg_strings[0];
+  const event = arg_strings.length > 1 ? arg_strings[1] : 'test';
+  await backend.listen_to_broadcast_channel(channel, event);
+};
+
+// send to broadcast channel
+const schan = async (args) => {
+  const arg_strings = parse_args(args);
+  const channel = arg_strings[0];
+  const event = arg_strings.length > 2 ? arg_strings[1] : 'test';
+  const message = arg_strings[arg_strings.length - 1];
+  await backend.send_to_broadcast_channel(channel, event, message);
+};
+
+// sync and track presence state
+const tpres = async (args) => {
+  const channel_name = args.trim();
+  backend.sync_track_presence(channel_name);
+};
+
+// send presence state
+const spres = async (args) => {
+  const channel_name = args.trim();
+  backend.send_presence(channel_name);
+};
+
+// stop tracking presence state
+const stpres = async (args) => {
+  const channel_name = args.trim();
+  backend.stop_presence(channel_name);
+};
+
+// listen to table
+const ldb = async (args) => {
+  await backend.listen_to_table(args.trim());
+};
+
+// beep
 function beeping(beep_id, status = null) {
   if (beep_id !== null && status !== null) {
     core.Session.config['beeping'][beep_id] = status;
@@ -243,6 +304,24 @@ const dev = async (args) => {
     await beep(args);
   } else if (experiment == 'edge') {
     await edge(args);
+  } else if (experiment == 'subscribe' || experiment == 'sub') {
+    await sub(args);
+  } else if (experiment == 'unsubscribe' || experiment == 'unsub') {
+    await unsub(args);
+  } else if (experiment == 'listchannels' || experiment == 'lschan') {
+    await lschan();
+  } else if (experiment == 'listenchan' || experiment == 'lchan') {
+    await lchan(args);
+  } else if (experiment == 'sendchan' || experiment == 'schan') {
+    await schan(args);
+  } else if (experiment == 'trackpresence' || experiment == 'tpres') {
+    await tpres(args);
+  } else if (experiment == 'sendpresence' || experiment == 'spres') {
+    await spres(args);
+  } else if (experiment == 'stoptrackpresence' || experiment == 'stpres') {
+    await stpres(args);
+  } else if (experiment == 'listendb' || experiment == 'ldb') {
+    await ldb(args);
   } else if (experiment == 'ping') {
     await ping(args);
   } else {
@@ -255,7 +334,15 @@ function parse_args(args) {
   if (args == '') {
     return '';
   }
-  return args.split(' ');
+  const regex = /(?:[^\s"']+|"([^"]*)"|'([^']*)')+/g;
+  const matches = args.match(regex);
+  if (!matches) {
+    return args.split(' ');
+  } else {
+    return matches.map(match => {
+      return match.replace(/^['"]|['"]$/g, '');
+    });
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
