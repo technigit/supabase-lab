@@ -45,6 +45,7 @@ class Session():
     prompt_app = None          # prompt_toolkit Application object
     prompt = '>> '             # session prompt after logging in
     supabase = None            # Supabase connection object
+    subscriptions = {}         # Supabase subscriptions
     realtime = None            # Supabase realtime connection object
 
 ################################################################################

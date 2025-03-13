@@ -9,6 +9,7 @@
 # See the LICENSE file in the project root for more information.
 ################################################################################
 
+import asyncio
 import fileinput
 import re
 
@@ -61,5 +62,9 @@ def get_config(config_files):
 async def exit_completely():
     if core.Session.authenticated:
         await backend.sign_out()
+    for task in asyncio.all_tasks():
+        if task is not asyncio.current_task():
+            task.cancel()
+        await asyncio.sleep(0.001) # keep things moving along
     print('Bye.')
     core.Main.running = False

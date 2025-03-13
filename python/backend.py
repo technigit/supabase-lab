@@ -11,6 +11,7 @@
 
 try:
     from realtime._async.client import AsyncRealtimeClient
+    from realtime.types import RealtimeSubscribeStates
     REALTIME_IMPORTED = True
 except ImportError:
     REALTIME_IMPORTED = False
@@ -24,6 +25,7 @@ try:
     SUPABASE_IMPORTED = True
 except ImportError:
     SUPABASE_IMPORTED = False
+from typing import Optional
 
 import core
 
@@ -60,10 +62,13 @@ async def connect():
     core.Session.config['api_key'] = api_key
     try:
         core.Session.supabase = await acreate_client(url, api_key)
-        core.Session.realtime = AsyncRealtimeClient(url, api_key)
+        core.Session.realtime = AsyncRealtimeClient(websocket_url(), api_key)
         print('Ready to login.')
     except Exception as e: # pylint: disable=broad-exception-caught
         core.handle_error('connect()', e)
+
+def websocket_url():
+    return core.Session.config['url'].replace('http://', 'wss://').replace('https://', 'wss://') + '/realtime/v1'
 
 ################################################################################
 # run a Supabase Edge Function
@@ -93,6 +98,131 @@ def edge_function(url, payload):
         core.handle_error('edge_function()', e)
     except Exception as e: # pylint: disable=broad-exception-caught
         core.handle_error('edge_function()', e, True)
+
+################################################################################
+# display subscribe state messages
+################################################################################
+
+def on_subscribe_for_channel(channel_name, for_table = False):
+    def on_subscribe(status: RealtimeSubscribeStates, error: Optional[Exception]):
+        if status == RealtimeSubscribeStates.SUBSCRIBED:
+            if not for_table:
+                print(f"Subscribed channel: {channel_name}")
+            else:
+                print(f"Listening for changes on table: {channel_name}")
+        elif status == RealtimeSubscribeStates.CLOSED:
+            print(f"Closed channel: {channel_name}")
+        elif status == RealtimeSubscribeStates.TIMED_OUT:
+            core.supabase_error_print('Channel connection timed out')
+        elif status == RealtimeSubscribeStates.CHANNEL_ERROR:
+            core.supabase_error_print(f"Error subscribing to channel: {error.message}")
+
+    return on_subscribe
+
+################################################################################
+# subscribe to a channel
+################################################################################
+
+async def subscribe_channel(channel_name, force = True):
+    if channel_name in core.Session.subscriptions:
+        subscription = core.Session.subscriptions[channel_name]
+    else:
+        if not force:
+            core.error_print(f"Please first subscribe to channel: {channel_name}")
+            return False
+        client = core.Session.realtime
+        await client.connect()
+        channel = client.channel(channel_name, { 'type': 'broadcast', 'event': 'test' })
+        subscription = await channel.subscribe(on_subscribe_for_channel(channel_name))
+        register_channel(channel_name, subscription)
+        await client.listen()
+    return subscription
+
+################################################################################
+# unsubscribe from a channel
+################################################################################
+
+async def unsubscribe_channel(channel_name):
+    if channel_name not in core.Session.subscriptions:
+        return
+    subscription = core.Session.subscriptions[channel_name]
+    if subscription:
+        await subscription.unsubscribe()
+        del core.Session.subscriptions[channel_name]
+        print(f"Closed channel: {channel_name}")
+
+################################################################################
+# register a channel for later reference
+################################################################################
+
+def register_channel(channel_name, subscription):
+    if subscription:
+        core.Session.subscriptions[channel_name] = subscription
+    else:
+        core.supabase_error_print(f"{channel_name}: Invalid subscription object.")
+
+################################################################################
+# list registered channels
+################################################################################
+
+async def list_channels():
+    for channel_name in core.Session.subscriptions:
+        print(channel_name)
+
+################################################################################
+# listen for broadcast messages on a channel
+################################################################################
+
+async def listen_to_broadcast_channel(channel_name, event):
+    if channel_name == '':
+        core.error_print('Please specify a channel.')
+        return
+
+    await core.Session.realtime.connect()
+    subscription = await subscribe_channel(channel_name)
+    subscription.on_broadcast(event, lambda payload: print(f"FROM {channel_name}: {payload}"))
+
+################################################################################
+# send broadcast message on a channel
+################################################################################
+
+async def send_to_broadcast_channel(channel_name, event, message_text):
+    if message_text == '':
+        core.error_print('Empty message not sent.')
+        return
+
+    message = {
+        'type': 'broadcast',
+        'event': event,
+        'payload': {
+            'message': message_text,
+        }
+    }
+    await core.Session.realtime.connect()
+    subscription = await subscribe_channel(channel_name, False)
+    if subscription is not False:
+        await subscription.send_broadcast(event, {'message': message_text})
+        print(f"TO {channel_name}: {message}")
+
+################################################################################
+# listen for database table changes
+################################################################################
+
+async def listen_to_table(table_name):
+    client = core.Session.realtime
+    await client.connect()
+    channel = client.channel('table_changes', {
+        'type': 'postgres_changes',
+        'table': table_name,
+        'event': '*'
+    })
+    channel.on_postgres_changes(
+        "*",
+        schema="public",
+        callback=print
+    )
+    await channel.subscribe(on_subscribe_for_channel(table_name, True))
+    await client.listen()
 
 ################################################################################
 # display response values after sending a request to Supabase

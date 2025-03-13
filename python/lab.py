@@ -144,7 +144,7 @@ async def main():
     except KeyboardInterrupt:
         await session.exit_completely()
     except Exception as e: # pylint: disable=broad-exception-caught
-        core.handle_error('prompt()', e)
+        core.handle_error('main()', e)
 
 # get default configuration
 session.get_config(['default.cfg'])
