@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 ################################################################################
 #
 # Supabase Lab
@@ -29,10 +27,11 @@ TIME_SUFFIX_DICT = {'': 1, 's': 1, 'm': 60, 'h': 60 * 60}
 # explore supabase object for development purposes
 ################################################################################
 
-def explore(args = None):
+async def explore(args = None):
     if core.Session.authenticated:
         try:
-            data = core.Session.supabase.auth.get_session().model_dump()
+            gs = await core.Session.supabase.auth.get_session()
+            data = gs.model_dump()
             found = True
             if args is not None:
                 found = False
@@ -68,6 +67,7 @@ def explore(args = None):
 # parse dev command-line statement
 ################################################################################
 
+# edge
 def edge(args = None):
     pa = parse_args(args)
     endpoint = pa[0]
@@ -78,9 +78,59 @@ def edge(args = None):
         payload = {}
     backend.edge_function(core.Session.config['url'] + f"/functions/v1/{endpoint}", payload)
 
+# ping
 def ping(args = None):
     print(f"ping {args}")
 
+# subscribe to channel
+async def sub(args):
+    channel_name = args.strip()
+    await backend.subscribe_channel(channel_name)
+
+# unsubscribe from channel
+async def unsub(args):
+    channel_name = args.strip()
+    await backend.unsubscribe_channel(channel_name)
+
+# list channels
+async def lschan():
+    await backend.list_channels()
+
+# listen to broadcast channel
+async def lchan(args):
+    arg_strings = parse_args(args)
+    channel_name = arg_strings[0]
+    event = arg_strings[1] if len(arg_strings) > 1 else 'test'
+    await backend.listen_to_broadcast_channel(channel_name, event)
+
+# send to broadcast channel
+async def schan(args):
+    arg_strings = parse_args(args)
+    channel_name = arg_strings[0]
+    event = arg_strings[1] if len(arg_strings) > 2 else 'test'
+    message = arg_strings[-1]
+    await backend.send_to_broadcast_channel(channel_name, event, message)
+
+# sync and track presence state
+async def tpres(args):
+    channel_name = args.strip()
+    await backend.sync_track_presence(channel_name)
+
+# send presence state
+async def spres(args):
+    channel_name = args.strip()
+    await backend.send_presence(channel_name)
+
+# stop tracking presence state
+async def stpres(args):
+    channel_name = args.strip()
+    await backend.stop_presence(channel_name)
+
+# listen to table
+async def ldb(args):
+    await backend.listen_to_table(args.strip())
+
+# beep
 def beeping(beep_id, status = None):
     if beep_id is not None and status is not None:
         core.Session.config['beeping'][beep_id] = status
@@ -117,7 +167,7 @@ async def run_beep(beep_id, beep_message, beep_interval):
         pass
 
 async def beep(args = None):
-    #check for beep stop
+    # check for beep stop
     args = args.strip()
     m = re.match(r'^stop (\d*)$', args)
     if m is not None:
@@ -179,6 +229,7 @@ async def beep(args = None):
         await beep_task
         del_beep_id(beep_id)
 
+# dev
 async def dev(args = None):
     if args is None:
         print('dev?')
@@ -191,20 +242,41 @@ async def dev(args = None):
         experiment = m.group(1)
         args = m.group(2)
     if experiment == 'explore':
-        explore(args)
+        await explore(args)
     elif experiment == 'beep':
         asyncio.create_task(beep(args))
     elif experiment == 'edge':
         edge(args)
+    elif experiment == 'subscribe' or experiment == 'sub':
+        asyncio.create_task(sub(args))
+    elif experiment == 'unsubscribe' or experiment == 'unsub':
+        asyncio.create_task(unsub(args))
+    elif experiment == 'listchannels' or experiment == 'lschan':
+        asyncio.create_task(lschan())
+    elif experiment == 'listenchan' or experiment == 'lchan':
+        asyncio.create_task(lchan(args))
+    elif experiment == 'sendchan' or experiment == 'schan':
+        asyncio.create_task(schan(args))
+    elif experiment == 'trackpresence' or experiment == 'tpres':
+        asyncio.create_task(tpres(args))
+    elif experiment == 'sendpresence' or experiment == 'spres':
+        asyncio.create_task(spres(args))
+    elif experiment == 'stoptrackpresence' or experiment == 'stpres':
+        asyncio.create_task(stpres(args))
+    elif experiment == 'listendb' or experiment == 'ldb':
+        asyncio.create_task(ldb(args))
     elif experiment == 'ping':
         ping(args)
     else:
         print(f"{experiment}?")
 
-def parse_args(args = None):
-    if args is None:
-        return None
-    return args.split()
+# parse_args
+def parse_args(args):
+    if args == '':
+        return ['']
+    regex = r'(?:([^\s\'"]+)|"([^"]*)"|\'([^\']*)\')+' # group quoted terms
+    matches = re.findall(regex, args)
+    return [match[0] or match[1] or match[2] for match in matches]
 
 ################################################################################
 # debug function to inspect important values

@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 ################################################################################
 #
 # Supabase Lab
@@ -47,6 +45,7 @@ class Session():
     prompt_app = None          # prompt_toolkit Application object
     prompt = '>> '             # session prompt after logging in
     supabase = None            # Supabase connection object
+    subscriptions = {}         # Supabase subscriptions
     realtime = None            # Supabase realtime connection object
 
 ################################################################################
@@ -74,12 +73,15 @@ def info_print(message):
 def error_print(message):
     print(f"<E> {message}")
 
+def supabase_error_print(message):
+    print(f"<S> {message}")
+
 def verbose_print(message):
     if verbose():
         print(message)
 
 def handle_error(message, e, force_verbose = False):
-    print(f"{message}: {type(e).__name__}: {str(e)}")
+    error_print(f"{message}: {type(e).__name__}: {str(e)}")
     if verbose() or force_verbose:
         traceback.print_exc()
 
