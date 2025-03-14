@@ -111,6 +111,21 @@ async def schan(args):
     message = arg_strings[-1]
     await backend.send_to_broadcast_channel(channel_name, event, message)
 
+# sync and track presence state
+async def tpres(args):
+    channel_name = args.strip()
+    await backend.sync_track_presence(channel_name)
+
+# send presence state
+async def spres(args):
+    channel_name = args.strip()
+    await backend.send_presence(channel_name)
+
+# stop tracking presence state
+async def stpres(args):
+    channel_name = args.strip()
+    await backend.stop_presence(channel_name)
+
 # listen to table
 async def ldb(args):
     await backend.listen_to_table(args.strip())
@@ -242,6 +257,12 @@ async def dev(args = None):
         asyncio.create_task(lchan(args))
     elif experiment == 'sendchan' or experiment == 'schan':
         asyncio.create_task(schan(args))
+    elif experiment == 'trackpresence' or experiment == 'tpres':
+        asyncio.create_task(tpres(args))
+    elif experiment == 'sendpresence' or experiment == 'spres':
+        asyncio.create_task(spres(args))
+    elif experiment == 'stoptrackpresence' or experiment == 'stpres':
+        asyncio.create_task(stpres(args))
     elif experiment == 'listendb' or experiment == 'ldb':
         asyncio.create_task(ldb(args))
     elif experiment == 'ping':
