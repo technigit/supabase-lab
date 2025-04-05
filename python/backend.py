@@ -195,16 +195,13 @@ async def send_to_broadcast_channel(channel_name, event, message_text):
         return
 
     message = {
-        'type': 'broadcast',
-        'event': event,
-        'payload': {
-            'message': message_text,
-        }
+        'message': message_text,
+        'from': core.Session.config['email'],
     }
     await core.Session.realtime.connect()
     subscription = await subscribe_channel(channel_name, False)
     if subscription is not False:
-        await subscription.send_broadcast(event, {'message': message_text})
+        await subscription.send_broadcast(event, message)
         print(f"TO {channel_name}: {message}")
 
 ################################################################################

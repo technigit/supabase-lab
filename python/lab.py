@@ -30,7 +30,7 @@ import core
 import dev
 import session
 
-core.Main.version = 'v0.0.7py'
+core.Main.version = 'v0.0.8py'
 
 ################################################################################
 # check for required imports

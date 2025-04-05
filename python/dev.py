@@ -69,9 +69,16 @@ async def explore(args = None):
 
 # edge
 def edge(args = None):
-    pa = parse_args(args)
+    pa = parse_args(args, 3)
     endpoint = pa[0]
-    payload_str = pa[1].replace(SPACE_DELIM, ' ')
+    if endpoint == '':
+        print('url?')
+        return
+    if len(pa) > 1:
+        payload_str = pa[1].replace(SPACE_DELIM, ' ')
+    else:
+        print('payload?')
+        return
     try:
         payload = ast.literal_eval(payload_str)
     except: # pylint: disable=bare-except
@@ -84,7 +91,7 @@ def ping(args = None):
 
 # subscribe to channel
 async def sub(args):
-    channel_name = args.strip()
+    channel_name = args.strip(' \'"')
     await backend.subscribe_channel(channel_name)
 
 # unsubscribe from channel
@@ -271,12 +278,19 @@ async def dev(args = None):
         print(f"{experiment}?")
 
 # parse_args
-def parse_args(args):
+def parse_args(args, delimited = 0): # delimit all by default
     if args == '':
         return ['']
-    regex = r'(?:([^\s\'"]+)|"([^"]*)"|\'([^\']*)\')+' # group quoted terms
-    matches = re.findall(regex, args)
-    return [match[0] or match[1] or match[2] for match in matches]
+    if delimited == 0: # parse through the whole string
+        regex = r'(?:([^\s\'"]+)|"([^"]*)"|\'([^\']*)\')+' # group quoted terms
+        matches = re.findall(regex, args)
+        return [match[0] or match[1] or match[2] for match in matches]
+    else: # grab the specified number of elements from the beginning
+        elements = args.split()
+        if len(elements) > delimited:
+            return elements[:delimited] + [' '.join(elements[delimited:])]
+        else:
+            return elements
 
 ################################################################################
 # debug function to inspect important values
