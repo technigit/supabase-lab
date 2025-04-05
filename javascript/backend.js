@@ -155,6 +155,7 @@ async function send_to_broadcast_channel(channel_name, event, message_text) {
     event: event,
     payload: {
       message: message_text,
+      from: core.Session.config['email'],
     }
   };
   core.Session.supabase.channel(channel_name).send(message);

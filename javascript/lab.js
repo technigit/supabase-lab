@@ -16,7 +16,7 @@ const backend = require('./backend');
 const session = require('./session');
 const dev = require('./dev');
 
-core.Main.version = 'v0.0.7js';
+core.Main.version = 'v0.0.8js';
 
 ////////////////////////////////////////////////////////////////////////////////
 // command-line interface
