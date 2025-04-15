@@ -73,6 +73,12 @@ async def connect():
 def websocket_url():
     return core.Session.config['url'].replace('http://', 'wss://').replace('https://', 'wss://') + '/realtime/v1'
 
+def check_connection():
+    if core.Session.supabase:
+        return True
+    core.supabase_error_print('Supabase client not connected.')
+    return False
+
 ################################################################################
 # run a Supabase Edge Function
 ################################################################################
@@ -126,19 +132,20 @@ def on_subscribe_for_channel(channel_name, for_table = False):
 # subscribe to a channel
 ################################################################################
 
-async def subscribe_channel(channel_name, force = True):
+async def subscribe_channel(channel_name, event = 'test', force = True):
+    if not check_connection():
+        return False
     if channel_name in core.Session.subscriptions:
         subscription = core.Session.subscriptions[channel_name]
-    else:
-        if not force:
-            core.error_print(f"Please first subscribe to channel: {channel_name}")
-            return False
-        client = core.Session.realtime
-        await client.connect()
-        channel = client.channel(channel_name, { 'type': 'broadcast', 'event': 'test' })
-        subscription = await channel.subscribe(on_subscribe_for_channel(channel_name))
-        register_channel(channel_name, subscription)
-        await client.listen()
+        return subscription
+    if not force:
+        core.error_print(f"Please first subscribe to channel: {channel_name}")
+        return False
+    client = core.Session.realtime
+    await client.connect()
+    channel = client.channel(channel_name, { 'type': 'broadcast', 'event': event, "config": {"broadcast": {"self": True}}})
+    subscription = await channel.subscribe(on_subscribe_for_channel(channel_name))
+    register_channel(channel_name, subscription)
     return subscription
 
 ################################################################################
@@ -146,6 +153,8 @@ async def subscribe_channel(channel_name, force = True):
 ################################################################################
 
 async def unsubscribe_channel(channel_name):
+    if not check_connection():
+        return
     if channel_name not in core.Session.subscriptions:
         return
     subscription = core.Session.subscriptions[channel_name]
@@ -177,6 +186,8 @@ async def list_channels():
 ################################################################################
 
 async def listen_to_broadcast_channel(channel_name, event):
+    if not check_connection():
+        return
     if channel_name == '':
         core.error_print('Please specify a channel.')
         return
@@ -189,20 +200,14 @@ async def listen_to_broadcast_channel(channel_name, event):
 # send broadcast message on a channel
 ################################################################################
 
-async def send_to_broadcast_channel(channel_name, event, message_text):
-    if message_text == '':
-        core.error_print('Empty message not sent.')
+async def send_to_broadcast_channel(channel_name, event, payload):
+    if not check_connection():
         return
-
-    message = {
-        'message': message_text,
-        'from': core.Session.config['email'],
-    }
     await core.Session.realtime.connect()
-    subscription = await subscribe_channel(channel_name, False)
+    subscription = await subscribe_channel(channel_name, event, False)
     if subscription is not False:
-        await subscription.send_broadcast(event, message)
-        print(f"TO {channel_name}: {message}")
+        await subscription.send_broadcast(event, payload)
+        print(f"TO {channel_name}: {payload}")
 
 ################################################################################
 # listen for presence signals on a channel

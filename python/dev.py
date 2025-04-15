@@ -11,6 +11,7 @@
 
 import ast
 import asyncio
+import json
 import re
 import threading
 
@@ -115,8 +116,18 @@ async def schan(args):
     arg_strings = parse_args(args)
     channel_name = arg_strings[0]
     event = arg_strings[1] if len(arg_strings) > 2 else 'test'
-    message = arg_strings[-1]
-    await backend.send_to_broadcast_channel(channel_name, event, message)
+    message_text = arg_strings[-1]
+    if message_text == '':
+        core.error_print('Empty message not sent.')
+        return
+    try:
+        payload = json.loads(message_text)
+    except json.JSONDecodeError:
+        payload = {
+            'message': message_text,
+            'from': core.Session.config['email'],
+        }
+    await backend.send_to_broadcast_channel(channel_name, event, payload)
 
 # sync and track presence state
 async def tpres(args):

@@ -50,21 +50,29 @@ async def prompt():
     input_session = PromptSession(color_depth=ColorDepth.MONOCHROME, history=history)
 
     # in-place substitutions with config values
-    def parse_dot_references(match):
-        dot_ref = match.group(0)[1:]
-        ref_value = core.Session.config.get(dot_ref, match.group(0))
-        if isinstance(ref_value, bool):
-            ref_value = str(ref_value)
-        if dot_ref == 'password': # don't show passwords in clear text when using the print command
-            ref_value = '*' * len(ref_value)
-        return ref_value
+    def parse_dot_references(line):
+
+        def get_dot_reference(match):
+            dot_ref = match.group(0)[1:]
+            ref_value = core.Session.config.get(dot_ref, match.group(0))
+            if isinstance(ref_value, bool):
+                ref_value = str(ref_value)
+            if dot_ref == 'password': # don't show passwords in clear text when using the print command
+                ref_value = '*' * len(ref_value)
+            return ref_value
+
+        previous_line = ''
+        while previous_line != line:
+            previous_line = line
+            line = re.sub(r'\.\w+', get_dot_reference, line)
+        return line
 
     # main input loop
     while core.Main.running:
         # prompt for auth/session input
         input_prompt = core.Session.prompt if core.Session.authenticated else core.Main.auth_prompt
         line = await input_session.prompt_async(input_prompt)
-        line = re.sub(r'\.\w+', parse_dot_references, line)
+        line = parse_dot_references(line)
         await parse(line)
 
         # detect terminated session
