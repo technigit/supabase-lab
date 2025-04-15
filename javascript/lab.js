@@ -26,16 +26,26 @@ let exit_command = false;
 
 const parse = async (line) => {
 
-  function parse_dot_references(match) {
-    let dot_ref = match.slice(1);
-    let ref_value = core.Session.config[dot_ref] ?? match;
-    if (typeof ref_value === 'boolean') {
-      ref_value = String(ref_value);
+  function parse_dot_references(line) {
+
+    function get_dot_reference(match) {
+      let dot_ref = match.slice(1);
+      let ref_value = core.Session.config[dot_ref] ?? match;
+      if (typeof ref_value === 'boolean') {
+        ref_value = String(ref_value);
+      }
+      if (dot_ref == 'password') { // don't show passwords in clear text when using the print command
+        ref_value = '*'.repeat(ref_value.length);
+      }
+      return ref_value;
     }
-    if (dot_ref == 'password') {
-      ref_value = '*'.repeat(ref_value.length);
+
+    let previous_line = '';
+    while (previous_line != line) {
+      previous_line = line;
+      line = line.replace(/\.\w+/g, get_dot_reference);
     }
-    return ref_value;
+    return line;
   }
 
   // prompt for email
@@ -63,7 +73,7 @@ const parse = async (line) => {
 
 // parse input
   core.Session.current_input = ''; // clear input for next prompt
-  line = line.replace(/\.\w+/g, parse_dot_references);
+  line = parse_dot_references(line);
   let command = line;
   let args = '';
   const m = line.match(/^(\S*)\s(.*)$/);

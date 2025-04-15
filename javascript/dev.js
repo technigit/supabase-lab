@@ -104,8 +104,21 @@ const schan = async (args) => {
   const arg_strings = parse_args(args);
   const channel_name = arg_strings[0];
   const event = arg_strings.length > 2 ? arg_strings[1] : 'test';
-  const message = arg_strings[arg_strings.length - 1];
-  await backend.send_to_broadcast_channel(channel_name, event, message);
+  const message_text = arg_strings[arg_strings.length - 1];
+  if (message_text == '' || !message_text) {
+    core.error_print('Empty message not sent.');
+    return;
+  }
+  let payload;
+  try {
+    payload = JSON.parse(message_text);
+  } catch {
+    payload = {
+      message: message_text,
+      from: core.Session.config['email'],
+    };
+  }
+  await backend.send_to_broadcast_channel(channel_name, event, payload);
 };
 
 // sync and track presence state

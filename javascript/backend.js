@@ -44,6 +44,14 @@ const connect = async () => {
   }
 };
 
+function check_connection() {
+  if (core.Session.supabase) {
+    return true;
+  }
+  core.supabase_error_print('Supabase client not connected.');
+  return false;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // run a Supabase Edge Function
 ////////////////////////////////////////////////////////////////////////////////
@@ -74,6 +82,9 @@ const edge_function = async (url, payload) => {
 ////////////////////////////////////////////////////////////////////////////////
 
 async function subscribe_channel(channel_name) {
+  if (!check_connection()) {
+    return false;
+  }
   const subscription = core.Session.supabase.channel(channel_name);
   subscription
     .subscribe((status) => {
@@ -96,6 +107,9 @@ async function subscribe_channel(channel_name) {
 ////////////////////////////////////////////////////////////////////////////////
 
 async function unsubscribe_channel(channel_name) {
+  if (!check_connection()) {
+    return;
+  }
   const subscription = core.Session.subscriptions[channel_name];
   if (subscription) {
     const { error: unsubscribeError } = await subscription.unsubscribe();
@@ -135,28 +149,26 @@ async function list_channels() {
 
 async function listen_to_broadcast_channel(channel_name, event) {
   const subscription = await subscribe_channel(channel_name);
-  subscription
-    .on('broadcast', { event: event }, (payload) => {
-      core.writeln(`FROM ${channel_name}: ${JSON.stringify(payload)}`);
-    });
+  if (subscription) {
+    subscription
+      .on('broadcast', { event: event }, (payload) => {
+        core.writeln(`FROM ${channel_name}: ${JSON.stringify(payload)}`);
+      });
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // send broadcast message on a channel
 ////////////////////////////////////////////////////////////////////////////////
 
-async function send_to_broadcast_channel(channel_name, event, message_text) {
-  if (message_text == '' || !message_text) {
-    core.error_print('Empty message not sent.');
+async function send_to_broadcast_channel(channel_name, event, payload) {
+  if (!check_connection()) {
     return;
   }
   const message = {
     type: 'broadcast',
     event: event,
-    payload: {
-      message: message_text,
-      from: core.Session.config['email'],
-    }
+    payload: payload,
   };
   core.Session.supabase.channel(channel_name).send(message);
   core.writeln(`TO ${channel_name}: ${JSON.stringify(message)}`);
