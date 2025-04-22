@@ -48,8 +48,16 @@ const explore = async () => {
 // edge
 const edge = async (args) => {
   let pa = parse_args(args);
-  let endpoint = pa[1];
-  let payload_str = pa[2].replace(SPACE_DELIM, ' ');
+  if (pa.length == 0) {
+    core.writeln('url?');
+    return;
+  }
+  if (pa.length == 1) {
+    core.writeln('payload?');
+    return;
+  }
+  let endpoint = pa[0];
+  let payload_str = pa[1].replace(SPACE_DELIM, ' ');
   let payload;
   try {
     payload = JSON.parse(payload_str);
@@ -86,18 +94,31 @@ const lschan = async () => {
 // listen to broadcast channel
 const lchan = async (args) => {
   const arg_strings = parse_args(args);
-  const channel = arg_strings[0];
+  const channel_name = arg_strings[0];
   const event = arg_strings.length > 1 ? arg_strings[1] : 'test';
-  await backend.listen_to_broadcast_channel(channel, event);
+  await backend.listen_to_broadcast_channel(channel_name, event);
 };
 
 // send to broadcast channel
 const schan = async (args) => {
   const arg_strings = parse_args(args);
-  const channel = arg_strings[0];
+  const channel_name = arg_strings[0];
   const event = arg_strings.length > 2 ? arg_strings[1] : 'test';
-  const message = arg_strings[arg_strings.length - 1];
-  await backend.send_to_broadcast_channel(channel, event, message);
+  const message_text = arg_strings[arg_strings.length - 1];
+  if (message_text == '' || !message_text) {
+    core.error_print('Empty message not sent.');
+    return;
+  }
+  let payload;
+  try {
+    payload = JSON.parse(message_text);
+  } catch {
+    payload = {
+      message: message_text,
+      from: core.Session.config['email'],
+    };
+  }
+  await backend.send_to_broadcast_channel(channel_name, event, payload);
 };
 
 // sync and track presence state
@@ -418,6 +439,12 @@ function debug(args) {
   if (filter_list.includes('config') || no_filters) {
     core.writeln('config:');
     core.print_item(core.Session.config, '   ');
+  }
+  if (filter_list.includes('subscriptions') || filter_list.includes('subs')) {
+    core.writeln('Subscriptions:');
+    for (let subscription in core.Session.subscriptions) {
+      core.writeln(`   ${subscription}`);
+    }
   }
   if (filter_list.includes('tasks')) {
     core.writeln('Tasks:');
