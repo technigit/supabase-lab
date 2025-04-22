@@ -85,7 +85,12 @@ async function subscribe_channel(channel_name) {
   if (!check_connection()) {
     return false;
   }
-  const subscription = core.Session.supabase.channel(channel_name);
+  let subscription = core.Session.subscriptions[channel_name];
+  if (subscription) {
+    core.info_print(`Already subscribed to ${channel_name}.`);
+    return subscription;
+  }
+  subscription = core.Session.supabase.channel(channel_name);
   subscription
     .subscribe((status) => {
       if (status === 'SUBSCRIBED') {
@@ -179,21 +184,30 @@ async function send_to_broadcast_channel(channel_name, event, payload) {
 ////////////////////////////////////////////////////////////////////////////////
 
 async function sync_track_presence(channel_name) {
+  function display_event(event, state, key = '') {
+    core.writeln(`${event}${key != '' ? ' ' + key : ''} ${JSON.stringify(state, null, 2)}`);
+  }
+
+  let show_sync = true;
   let channel = core.Session.subscriptions[channel_name];
   if (!channel) {
     channel = await subscribe_channel(channel_name);
+    show_sync = false; // sync event will trigger and display on its own
   }
   channel
     .on('presence', { event: 'sync' }, () => {
       const newState = channel.presenceState();
-      core.writeln(`sync ${JSON.stringify(newState, null, 2)}`);
+      display_event('sync', newState);
     })
     .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-      core.writeln(`join ${key} ${JSON.stringify(newPresences, null, 2)}`);
+      display_event('join', newPresences, key);
     })
     .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-      core.writeln(`leave ${key} ${JSON.stringify(leftPresences, null, 2)}`);
+      display_event('leave', leftPresences, key);
     });
+  if (show_sync) { // force sync display when already subscribed
+    display_event('sync', channel.presenceState());
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -210,7 +224,9 @@ async function send_presence(channel_name) {
     online_at: new Date().toISOString(),
   };
   const presenceTrackStatus = await channel.track(userStatus);
-  core.writeln(JSON.stringify(presenceTrackStatus, null, 2));
+  if (presenceTrackStatus != 'ok') {
+    core.writeln(JSON.stringify(presenceTrackStatus, null, 2));
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -221,6 +237,8 @@ async function stop_presence(channel_name) {
   const channel = core.Session.subscriptions[channel_name];
   if (channel) {
     channel.untrack();
+  } else {
+    core.info_print(`Found no subscription to ${channel_name}.`);
   }
 }
 

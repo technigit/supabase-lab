@@ -440,6 +440,12 @@ function debug(args) {
     core.writeln('config:');
     core.print_item(core.Session.config, '   ');
   }
+  if (filter_list.includes('subscriptions') || filter_list.includes('subs')) {
+    core.writeln('Subscriptions:');
+    for (let subscription in core.Session.subscriptions) {
+      core.writeln(`   ${subscription}`);
+    }
+  }
   if (filter_list.includes('tasks')) {
     core.writeln('Tasks:');
     show_tasks();
