@@ -9,7 +9,6 @@
 # See the LICENSE file in the project root for more information.
 ################################################################################
 
-import asyncio
 import json
 from datetime import datetime, timezone
 try:
@@ -136,8 +135,8 @@ async def subscribe_channel(channel_name, event = 'test', force = True):
     if not check_connection():
         return False
     if channel_name in core.Session.subscriptions:
-        subscription = core.Session.subscriptions[channel_name]
-        return subscription
+        core.info_print(f"Already subscribed to {channel_name}.")
+        return core.Session.subscriptions[channel_name]
     if not force:
         core.error_print(f"Please first subscribe to channel: {channel_name}")
         return False
@@ -214,42 +213,53 @@ async def send_to_broadcast_channel(channel_name, event, payload):
 ################################################################################
 
 async def sync_track_presence(channel_name):
-    channel = core.Session.supabase.channel(channel_name)
-    register_channel(channel_name, channel)
+    def display_event(event, state, key = ''):
+        print(f"{event}{f" {key}" if key != '' else ''} {json.dumps(state, indent=2)}")
 
     def on_sync():
         new_state = channel.presence_state()
-        print(f"sync {json.dumps(new_state, indent=2)}")
+        display_event('sync', new_state)
 
     def on_join(key, _, new_presences):
-        print(f"join {key} {json.dumps(new_presences, indent=2)}")
+        display_event('join', new_presences, key)
 
     def on_leave(key, _, left_presences):
-        print(f"leave {key} {json.dumps(left_presences, indent=2)}")
+        display_event('leave', left_presences, key)
 
-    await channel.on_presence_sync(on_sync).on_presence_join(on_join).on_presence_leave(on_leave).subscribe()
+    show_sync = True
+    if channel_name not in core.Session.subscriptions:
+        channel = await subscribe_channel(channel_name)
+        show_sync = False # sync event will trigger and display on its own
+    channel = core.Session.subscriptions[channel_name]
+    channel.on_presence_sync(on_sync).on_presence_join(on_join).on_presence_leave(on_leave)
+    if show_sync: # force sync display when already subscribed
+        display_event('sync', channel.presence_state())
 
 ################################################################################
 # send presence state on a channel
 ################################################################################
 
 async def send_presence(channel_name):
-    channel = await subscribe_channel(channel_name)
-    await asyncio.sleep(0.1)
+    if channel_name not in core.Session.subscriptions:
+        channel = await subscribe_channel(channel_name)
+    channel = core.Session.subscriptions[channel_name]
     user_status = {
         "user": core.Session.config['email'],
         "online_at": datetime.now(timezone.utc).isoformat()
     }
     presence_track_status = await channel.track(user_status)
-    print(f"{'ok' if presence_track_status is None else presence_track_status}")
+    if presence_track_status is not None:
+        print(presence_track_status)
 
 ################################################################################
 # stop presence tracking on a channel
 ################################################################################
 
 async def stop_presence(channel_name):
-    subscription = await subscribe_channel(channel_name)
-    await subscription.untrack()
+    if channel_name in core.Session.subscriptions:
+        await core.Session.subscriptions[channel_name].untrack()
+    else:
+        core.info_print(f"Found no subscription to {channel_name}.")
 
 ################################################################################
 # listen for database table changes

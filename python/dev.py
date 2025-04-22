@@ -327,6 +327,10 @@ def debug(args = ''):
     if 'config' in filter_list or no_filters:
         print('config:')
         core.print_item(core.Session.config, '   ')
+    if 'subscriptions' in filter_list or 'subs' in filter_list:
+        print('Subscriptions:')
+        for subscription in core.Session.subscriptions:
+            core.print_item(subscription, '   ')
     if 'tasks' in filter_list:
         list_tasks()
     if 'threads' in filter_list:
