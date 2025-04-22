@@ -11,6 +11,7 @@
 
 import ast
 import asyncio
+import json
 import re
 import threading
 
@@ -69,9 +70,16 @@ async def explore(args = None):
 
 # edge
 def edge(args = None):
-    pa = parse_args(args)
+    pa = parse_args(args, 3)
     endpoint = pa[0]
-    payload_str = pa[1].replace(SPACE_DELIM, ' ')
+    if endpoint == '':
+        print('url?')
+        return
+    if len(pa) > 1:
+        payload_str = pa[1].replace(SPACE_DELIM, ' ')
+    else:
+        print('payload?')
+        return
     try:
         payload = ast.literal_eval(payload_str)
     except: # pylint: disable=bare-except
@@ -84,7 +92,7 @@ def ping(args = None):
 
 # subscribe to channel
 async def sub(args):
-    channel_name = args.strip()
+    channel_name = args.strip(' \'"')
     await backend.subscribe_channel(channel_name)
 
 # unsubscribe from channel
@@ -108,8 +116,18 @@ async def schan(args):
     arg_strings = parse_args(args)
     channel_name = arg_strings[0]
     event = arg_strings[1] if len(arg_strings) > 2 else 'test'
-    message = arg_strings[-1]
-    await backend.send_to_broadcast_channel(channel_name, event, message)
+    message_text = arg_strings[-1]
+    if message_text == '':
+        core.error_print('Empty message not sent.')
+        return
+    try:
+        payload = json.loads(message_text)
+    except json.JSONDecodeError:
+        payload = {
+            'message': message_text,
+            'from': core.Session.config['email'],
+        }
+    await backend.send_to_broadcast_channel(channel_name, event, payload)
 
 # sync and track presence state
 async def tpres(args):
@@ -271,12 +289,19 @@ async def dev(args = None):
         print(f"{experiment}?")
 
 # parse_args
-def parse_args(args):
+def parse_args(args, delimited = 0): # delimit all by default
     if args == '':
         return ['']
-    regex = r'(?:([^\s\'"]+)|"([^"]*)"|\'([^\']*)\')+' # group quoted terms
-    matches = re.findall(regex, args)
-    return [match[0] or match[1] or match[2] for match in matches]
+    if delimited == 0: # parse through the whole string
+        regex = r'(?:([^\s\'"]+)|"([^"]*)"|\'([^\']*)\')+' # group quoted terms
+        matches = re.findall(regex, args)
+        return [match[0] or match[1] or match[2] for match in matches]
+    else: # grab the specified number of elements from the beginning
+        elements = args.split()
+        if len(elements) > delimited:
+            return elements[:delimited] + [' '.join(elements[delimited:])]
+        else:
+            return elements
 
 ################################################################################
 # debug function to inspect important values
@@ -302,6 +327,10 @@ def debug(args = ''):
     if 'config' in filter_list or no_filters:
         print('config:')
         core.print_item(core.Session.config, '   ')
+    if 'subscriptions' in filter_list or 'subs' in filter_list:
+        print('Subscriptions:')
+        for subscription in core.Session.subscriptions:
+            core.print_item(subscription, '   ')
     if 'tasks' in filter_list:
         list_tasks()
     if 'threads' in filter_list:
