@@ -10,10 +10,45 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 const axios = require('axios');
+const https = require('https');
 
 const { createClient } = require('@supabase/supabase-js');
 
 const core = require('./core');
+
+////////////////////////////////////////////////////////////////////////////////
+// check network connection
+////////////////////////////////////////////////////////////////////////////////
+
+function check_network_connection() {
+  let url = 'https://www.ifconfig.me/';
+  return new Promise((resolve) => {
+    const request = https.get(url, (response) => {
+      response.on('data', () => {}); // consume data to avoid memory leaks
+      
+      // response received
+      if (response.statusCode === 200) {
+        resolve(true);
+      } else {
+        core.network_error_print('unexpected network error');
+        resolve(false);
+      }
+    });
+
+    // network disconnected or not responding
+    request.on('error', () => {
+      core.network_error_print('no network connection');
+      resolve(false);
+    });
+
+    // net 
+    request.setTimeout(2000, () => {
+      core.network_error_print('network timeout');
+      request.destroy();
+      resolve(false);
+    });
+  });
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // connect to Supabase
@@ -97,10 +132,12 @@ async function subscribe_channel(channel_name) {
         core.writeln(`Subscribed channel: ${channel_name}`);
       } else if (status === 'CLOSED') {
         core.writeln(`Closed channel: ${channel_name}`);
+        deregister_channel(channel_name);
       } else if (status === 'RECONNECTING') {
         core.writeln(`Reconnecting to channel: ${channel_name}`);
       } else if (status === 'ERROR') {
         core.supabase_error_print(`Error subscribing to channel: ${channel_name}`);
+        deregister_channel(channel_name);
       }
     });
   register_channel(channel_name, subscription);
@@ -133,9 +170,19 @@ async function unsubscribe_channel(channel_name) {
 function register_channel(channel_name, subscription) {
   if (subscription) {
     core.Session.subscriptions[channel_name] = subscription;
+    core.writeln(`Registered channel: ${channel_name}`);
   } else {
     core.supabase_error_print(`${channel_name}: Invalid subscription object.`);
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// deregister a channel
+////////////////////////////////////////////////////////////////////////////////
+
+function deregister_channel(channel_name) {
+  delete core.Session.subscriptions[channel_name];
+  core.writeln(`Deregistered channel: ${channel_name}`);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -291,17 +338,19 @@ const sign_in = async (email, password) => {
   core.writeln('Logging in...');
 
   try {
-    const { data, error } = await core.Session.supabase.auth.signInWithPassword({ email: email, password: password });
-    if (error) {
-      core.supabase_error_print(`Login failed: ${error.message}`);
-    } else {
-      core.Session.jwt_token = data.session.access_token;
-      let session_user_email = data.session.user.email;
-      let last_sign_in_at = core.show_time(data.user.last_sign_in_at);
-      core.Session.authenticated = true;
-      core.update_prompt();
-      core.writeln(`${session_user_email} logged in.`);
-      core.writeln(`Last login: ${last_sign_in_at}`);
+    if (await check_network_connection()) {
+      const { data, error } = await core.Session.supabase.auth.signInWithPassword({ email: email, password: password });
+      if (error) {
+        core.supabase_error_print(`Login failed: ${error.message}`);
+      } else {
+        core.Session.jwt_token = data.session.access_token;
+        let session_user_email = data.session.user.email;
+        let last_sign_in_at = core.show_time(data.user.last_sign_in_at);
+        core.Session.authenticated = true;
+        core.update_prompt();
+        core.writeln(`${session_user_email} logged in.`);
+        core.writeln(`Last login: ${last_sign_in_at}`);
+      }
     }
   } catch (error) {
     if (error instanceof TypeError) {

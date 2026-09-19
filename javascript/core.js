@@ -97,8 +97,20 @@ function show_info() {
 }
 
 function show_time(date_string) {
-    const date = new Date(date_string);
-    return date.toLocaleString();
+  const date = new Date(date_string);
+  const options = { 
+      weekday: 'short', 
+      month: 'short', 
+      day: '2-digit', 
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit', 
+      year: 'numeric',
+      hour12: false 
+  };
+  const date_formatted = date.toLocaleString('en-US', options).replace(/,/g, '');
+  const [weekday, month, day, year, hms_time] = date_formatted.split(' ');
+  return `${weekday} ${month} ${day} ${hms_time} ${year}`;
 }
 
 function info_print(message) {
@@ -107,6 +119,10 @@ function info_print(message) {
 
 function error_print(message) {
   writeln(`<E> ${message}`);
+}
+
+function network_error_print(message) {
+  writeln(`<N> ${message}`);
 }
 
 function supabase_error_print(message) {
@@ -163,6 +179,7 @@ module.exports.show_info = show_info;
 module.exports.show_time = show_time;
 module.exports.info_print = info_print;
 module.exports.error_print = error_print;
+module.exports.network_error_print = network_error_print;
 module.exports.supabase_error_print = supabase_error_print;
 module.exports.handle_error = handle_error;
 module.exports.print_item = print_item;

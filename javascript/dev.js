@@ -441,9 +441,13 @@ function debug(args) {
     core.print_item(core.Session.config, '   ');
   }
   if (filter_list.includes('subscriptions') || filter_list.includes('subs')) {
-    core.writeln('Subscriptions:');
-    for (let subscription in core.Session.subscriptions) {
-      core.writeln(`   ${subscription}`);
+    if (Object.keys(core.Session.subscriptions).length > 0) {
+      core.writeln('Subscriptions:');
+      for (let subscription in core.Session.subscriptions) {
+        core.writeln(`   ${subscription}`);
+      }
+    } else {
+      core.info_print('No subscribed channels are registered.');
     }
   }
   if (filter_list.includes('tasks')) {
