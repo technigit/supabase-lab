@@ -65,7 +65,7 @@ Supabase Lab
 def show_time(date_string):
     dt_utc = datetime.fromisoformat(str(date_string))
     local_offset = datetime.now().astimezone().utcoffset()
-    return dt_utc + local_offset
+    return (dt_utc + local_offset).strftime('%a %b %d %H:%M:%S %Y')
 
 def info_print(message):
     print(f"<i> {message}")

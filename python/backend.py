@@ -120,10 +120,13 @@ def on_subscribe_for_channel(channel_name, for_table = False):
                 print(f"Listening for changes on table: {channel_name}")
         elif status == RealtimeSubscribeStates.CLOSED:
             print(f"Closed channel: {channel_name}")
+            deregister_channel(channel_name);
         elif status == RealtimeSubscribeStates.TIMED_OUT:
             core.supabase_error_print('Channel connection timed out')
+            deregister_channel(channel_name);
         elif status == RealtimeSubscribeStates.CHANNEL_ERROR:
-            core.supabase_error_print(f"Error subscribing to channel: {error.message}")
+            core.supabase_error_print(f"Error subscribing to channel: {channel_name}")
+            deregister_channel(channel_name);
 
     return on_subscribe
 
@@ -141,7 +144,10 @@ async def subscribe_channel(channel_name, event = 'test', force = True):
         core.error_print(f"Please first subscribe to channel: {channel_name}")
         return False
     client = core.Session.realtime
-    await client.connect()
+    try:
+        await client.connect()
+    except Exception as e: # pylint: disable=broad-exception-caught
+        core.supabase_error_print(f"subscribe_channel({channel_name}, {event}, {force}): {e}")
     channel = client.channel(channel_name, { 'type': 'broadcast', 'event': event, "config": {"broadcast": {"self": True}}})
     subscription = await channel.subscribe(on_subscribe_for_channel(channel_name))
     register_channel(channel_name, subscription)
@@ -169,8 +175,17 @@ async def unsubscribe_channel(channel_name):
 def register_channel(channel_name, subscription):
     if subscription:
         core.Session.subscriptions[channel_name] = subscription
+        print(f"Registered channel: {channel_name}");
     else:
         core.supabase_error_print(f"{channel_name}: Invalid subscription object.")
+
+################################################################################
+# deregister a channel
+################################################################################
+
+def deregister_channel(channel_name):
+    del core.Session.subscriptions[channel_name]
+    print(f"Deregistered channel: {channel_name}");
 
 ################################################################################
 # list registered channels
@@ -202,7 +217,10 @@ async def listen_to_broadcast_channel(channel_name, event):
 async def send_to_broadcast_channel(channel_name, event, payload):
     if not check_connection():
         return
-    await core.Session.realtime.connect()
+    try:
+        await core.Session.realtime.connect()
+    except Exception as e: # pylint: disable=broad-exception-caught
+        core.supabase_error_print(f"send_to_broadcast_channel({channel_name}, {event}, {payload}): {e}")
     subscription = await subscribe_channel(channel_name, event, False)
     if subscription is not False:
         await subscription.send_broadcast(event, payload)

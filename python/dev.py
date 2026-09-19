@@ -328,9 +328,12 @@ def debug(args = ''):
         print('config:')
         core.print_item(core.Session.config, '   ')
     if 'subscriptions' in filter_list or 'subs' in filter_list:
-        print('Subscriptions:')
-        for subscription in core.Session.subscriptions:
-            core.print_item(subscription, '   ')
+        if core.Session.subscriptions:
+            print('Subscriptions:')
+            for subscription in core.Session.subscriptions:
+                core.print_item(subscription, '   ')
+        else:
+            core.info_print('No subscribed channels are registered.');
     if 'tasks' in filter_list:
         list_tasks()
     if 'threads' in filter_list:
